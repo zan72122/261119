@@ -333,7 +333,7 @@ const scene = {
     if (!core.state.pack || typeof core.state.pack !== 'object') core.state.pack = {};
     const ps = core.state.pack;
     if (!ps.fl || typeof ps.fl !== 'object') ps.fl = {};
-    this.drag = null; this.lock = false; this.own = []; this.truckSt = 'none'; this.camK = 0; this.leaving = false;
+    this.drag = null; this.lock = false; this.own = []; this.truckSt = 'none'; this.camK = 0; this.leaving = false; this.stkAsk = false; this.stkLate = false; this.stkTm = null;
     this.engine = null; this.tapeSnd = null; this.camTw = null;
 
     // 前回の箱を片付ける（中身は取り出してから）
@@ -459,6 +459,7 @@ const scene = {
   topY() { return this.parcel.group.position.y + PH + (core.state.parcel.closed ? 2 * PT : 0); },
 
   applyStage() {
+    if (this.stkAsk) { if (this.stkLate && !this.drag) { this.endAskSticker(); this.arrive(); } return; }
     this.clearOwn();
     const st = this.stage = this.stageOf(), P = core.state.parcel, fx = core.fx;
     this.lock = false;
@@ -882,10 +883,12 @@ const scene = {
         core.fx.burst(tgt, { n: d.isLabel ? 12 : 7, kind: 'star', size: 0.018, speed: 0.4, life: 0.6, gravity: -0.6 });
         this.lock = false;
         if (d.isLabel && this.stage === 'D') {
-          this.lock = true; core.hint.clear(); this.clearOwn(); this.topGlow.visible = false;
+          core.hint.clear(); this.clearOwn();
           core.au.sparkle(77);
-          core.after(1.0, () => this.arrive());
-        } else if (this.stage === 'D') this.applyStage();
+          if (core.state.parcel.stickers.length === 0) this.askSticker();
+          else { this.lock = true; this.topGlow.visible = false; core.after(1.0, () => this.arrive()); }
+        } else if (this.stkAsk) { this.endAskSticker(); this.lock = true; this.topGlow.visible = false; core.after(1.3, () => this.arrive()); }
+        else if (this.stage === 'D') this.applyStage();
       } });
       return;
     }
@@ -902,6 +905,22 @@ const scene = {
     m.visible = !used;
   },
   tagPlaced() { for (const m of this.parcel.stickerMeshes) m.userData.hitR = 0.03; },
+
+  // 宛名のあと、シールを1枚はるところまで案内する（はらなくても、しばらくすると軽トラが来る）
+  askSticker() {
+    const m = Object.values(this.sheet.stickers).find(x => x.visible && x.parent === this.sheet.group);
+    if (!m) { this.lock = true; core.after(1.0, () => this.arrive()); return; }
+    this.stkAsk = true; this.lock = false;
+    this.own.push(core.fx.pulse(m, { amp: 0.3 }));
+    this.own.push(core.fx.halo(m, { r: 0.05, y: 0.002, opacity: 0.5 }));
+    const vf = new V3(), vt = new V3();
+    core.hint.set({ kind: 'drag', arc: 0.08,
+      from: () => m.getWorldPosition(vf),
+      to: () => this.topWorld(vt).add(_d.set(0.11, 0.01, 0.075)), // 手前側: おばあちゃんの家で開けたときに見える面
+      cue: n => { if (n === 1 && m.parent === this.sheet.group) { this.hop(m, 0.02); core.au.pop(1.5); } } });
+    this.stkTm = core.after(16, () => { if (this.stkAsk && !this.drag) { this.endAskSticker(); this.arrive(); } else if (this.stkAsk) this.stkLate = true; });
+  },
+  endAskSticker() { this.stkAsk = false; this.stkLate = false; if (this.stkTm) this.stkTm.kill(); this.stkTm = null; core.hint.clear(); this.clearOwn(); },
 
   // ------------------------------------------------------------ E おくりだす
   arrive() {

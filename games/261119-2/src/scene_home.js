@@ -475,8 +475,8 @@ export default {
     const P = S(), H = Hs();
     if (P.tapes.length > 0) return 'A';
     if (P.closed) return 'B';
+    if (H.given.drawing && !H.wall) return 'W'; // 絵を手に持ったまま次の物を受け取らないよう、先に壁へ貼る
     if (P.items.length > 0) return 'C';
-    if (H.given.drawing && !H.wall) return 'W';
     if (!H.celebrated) return 'D0';
     const hasSt = R.parcel && R.parcel.stickerMeshes.some(m => m.parent === R.parcel.flaps.F.pivot);
     const faced = Object.keys(H.face).length > 0;
