@@ -321,7 +321,6 @@ export function createEngine(container) {
     renderer.setPixelRatio(dpr() * resScale);
     renderer.setSize(cssW, cssH, true);
     resizeTargets();
-    if (resScale < 0.8 && !quality.low) setLow();
   }
   function setLow() {
     quality.low = true;
@@ -336,17 +335,36 @@ export function createEngine(container) {
   // every resolution change reallocates the drawing buffer (a hitch): after a step up that had
   // to be undone soon, wait longer before trying again so the scale does not oscillate
   let upDelay = 5, perfClock = 0, lastUpAt = -100;
+  // a step down that does not speed frames up means the frame rate is capped, not GPU-bound
+  // (iOS Low Power Mode runs rAF at 30 Hz): undo it and stop lowering at that frame time
+  let trial = null, cappedFt = 0, holdUntil = 0, holdDur = 8;
   function updatePerf(rawDt) {
     perfClock += rawDt;
     if (perfWarmup > 0) { perfWarmup -= rawDt; return; }
     const ft = Math.min(rawDt, 0.2);
     ftEma += (ft - ftEma) * 0.08;
+    if (trial && perfClock - trial.t > 2.5) {
+      if (ftEma > trial.ft * 0.92) {
+        cappedFt = trial.ft;
+        holdUntil = perfClock + holdDur; holdDur = Math.min(60, holdDur * 2);
+        const back = trial.scale; trial = null;
+        setResScale(back);
+        slowTime = 0; fastTime = 0; perfWarmup = 0.5;
+        return;
+      }
+      trial = null;
+      if (resScale < 0.8 && !quality.low) setLow(); // the lower resolution helped: keep it lean
+    }
+    if (cappedFt && perfClock > holdUntil && ftEma > cappedFt * 1.3) cappedFt = 0; // genuinely slower than the cap
     if (ftEma > 0.030) { slowTime += rawDt; fastTime = 0; }
-    else if (ftEma < 0.020) { fastTime += rawDt; slowTime = 0; }
+    else if (ftEma < 0.020) { fastTime += rawDt; slowTime = 0; cappedFt = 0; }
     else { slowTime = Math.max(0, slowTime - rawDt); fastTime = 0; }
-    if (slowTime > 1.5 && resScale > 0.6) {
+    if (slowTime > 1.5 && resScale > 0.6 && !trial && !cappedFt) {
       if (perfClock - lastUpAt < 6) upDelay = Math.min(40, upDelay * 2);
-      setResScale(Math.max(0.6, Math.round((resScale - 0.1) * 10) / 10));
+      trial = { scale: resScale, ft: ftEma, t: perfClock };
+      // a big step: shortens the slow stretch, and a small one could hide its gain behind
+      // vsync quantisation (a 20 ms frame and an 18 ms frame both show at 30 fps)
+      setResScale(Math.max(0.6, Math.round((resScale - 0.2) * 10) / 10));
       slowTime = 0; perfWarmup = 0.5;
     } else if (fastTime > upDelay && resScale < 1) {
       setResScale(Math.min(1, Math.round((resScale + 0.1) * 10) / 10));
