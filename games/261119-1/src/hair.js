@@ -67,7 +67,7 @@
     '  bool cow = flag > 0.5 && flag < 1.5;',
     '  vec3 o = N * (aR.x - 0.6) * mix(mix(0.004, 0.010, frz), 0.0012, wet) * ramp;',
     '  float cr = mix(mix(0.0022, 0.0045, frz), 0.0020 * pow(1.0 - s, 1.4) + 0.0002, wet);',
-    '  if (cow) cr = 0.0012 * (1.0 - 0.6 * s);',
+    '  if (cow) cr = 0.0015 + 0.004 * s;',
     '  o += (N * aR.y + B * aR.z) * cr * ramp;',
     '  float fa = cow ? 0.0 : frz;',
     '  o += (N * sin(s * 8.0 + ph) * 0.7 + B * sin(s * 11.0 + ph * 1.7)) * 0.014 * fa * s;',
@@ -158,14 +158,14 @@
     '  vec3 Hh = normalize(L + V);',
     '  float wet = vHI.x * vHI.x, frz = vHI.y, slk = vHI.z;',
     '  float e1 = mix(mix(50.0, 200.0, slk), 320.0, wet);',
-    '  float k1 = mix(mix(0.025, 0.19, slk * slk) * (1.0 - 0.5 * frz), 0.20, wet);',
+    '  float k1 = mix(mix(0.025, 0.15, slk * slk) * (1.0 - 0.5 * frz), 0.20, wet);',
     '  float e2 = mix(30.0, 90.0, slk);',
     '  float k2 = mix(0.06, 0.12, slk) * (1.0 - 0.6 * wet);',
     '  vec3 T1 = normalize(T + N * (hairShift + 0.12));',
     '  vec3 T2 = normalize(T + N * (hairShift - 0.16));',
     '  float occ = smoothstep(-0.15, 0.35, NL) * smoothstep(0.02, 0.22, vHI.w);',
     '  vec3 tint = material.diffuseColor / max(max(material.diffuseColor.r, material.diffuseColor.g), 1e-4);',
-    '  vec3 spec = vec3(k1 * hKK(T1, Hh, e1)) + tint * k2 * hKK(T2, Hh, e2) * 0.5;',
+    '  vec3 spec = vec3(1.0, 0.92, 0.84) * (k1 * hKK(T1, Hh, e1)) + tint * k2 * hKK(T2, Hh, e2) * 0.5;',
     '  reflectedLight.directSpecular += spec * directLight.color * occ;',
     '}',
     '#define RE_Direct RE_Direct_Hair'
@@ -454,12 +454,12 @@
       var cU = [cowN[0] * 0.5, cowN[1] * 0.5 + 1, cowN[2] * 0.5 - 0.3], cul = Math.sqrt(cU[0] * cU[0] + cU[1] * cU[1] + cU[2] * cU[2]);
       cU[0] /= cul; cU[1] /= cul; cU[2] /= cul;
       for (var c = 0; c < NCOW; c++) {
-        var phi = r() * 6.28, rad = 0.0005 + r() * 0.0025;
+        var phi = r() * 6.28, rad = 0.001 + r() * 0.004;
         var ox = (cowF[0] * Math.cos(phi) + cowB[0] * Math.sin(phi)) * rad, oy = (cowF[1] * Math.cos(phi) + cowB[1] * Math.sin(phi)) * rad, oz = (cowF[2] * Math.cos(phi) + cowB[2] * Math.sin(phi)) * rad;
         cowOff[c * 3] = ox; cowOff[c * 3 + 1] = oy; cowOff[c * 3 + 2] = oz;
-        var len = 0.068 + r() * 0.010; cowLen[c] = len;
-        var beta = (c / (NCOW - 1) - 0.5) * 0.45 + (r() - 0.5) * 0.1;
-        var a0 = 0.04 + r() * 0.10, a1 = 1.9 + r() * 0.4;
+        var len = 0.070 + r() * 0.014; cowLen[c] = len;
+        var beta = (c / (NCOW - 1) - 0.5) * 0.9 + (r() - 0.5) * 0.15;
+        var a0 = 0.04 + r() * 0.10, a1 = 2.2 + r() * 0.4;
         var fx = cowF[0] * Math.cos(beta) + cowB[0] * Math.sin(beta), fy = cowF[1] * Math.cos(beta) + cowB[1] * Math.sin(beta), fz = cowF[2] * Math.cos(beta) + cowB[2] * Math.sin(beta);
         var px = cowRoot[0] + ox, py = cowRoot[1] + oy, pz = cowRoot[2] + oz, ds = len / (NS - 1);
         for (var j = 0; j < NS; j++) {
@@ -467,7 +467,8 @@
           cowUp[o] = px; cowUp[o + 1] = py; cowUp[o + 2] = pz;
           var s = (j + 0.5) / (NS - 1), ang = a0 + (a1 - a0) * Math.pow(s, 4.0);
           var ca = Math.cos(ang), sa = Math.sin(ang);
-          px += (cU[0] * ca + fx * sa) * ds; py += (cU[1] * ca + fy * sa) * ds; pz += (cU[2] * ca + fz * sa) * ds;
+          var lat = beta * 0.35 * s;
+          px += (cU[0] * ca + fx * sa + cowB[0] * lat) * ds; py += (cU[1] * ca + fy * sa + cowB[1] * lat) * ds; pz += (cU[2] * ca + fz * sa + cowB[2] * lat) * ds;
         }
       }
     })();
@@ -597,7 +598,7 @@
         var w = wet[g], d = 1 - w, base = g * NN, sg = segL[g];
         var damp = Math.exp(-(2.6 + 5 * w) * dt);
         var gy = -(1.2 + 2.6 * w);
-        var wAcc = 70 * d + 6 * w, tAcc = (55 * d + 4 * w) * (wind.breeze ? 0.4 : 1);
+        var wAcc = (130 * d + 8 * w) * (wind.breeze ? 0.4 : 1), tAcc = (90 * d + 5 * w) * (wind.breeze ? 0.3 : 1);
         var kRel = 1 - Math.exp(-(24 - 10 * w) * dt);
         var maxInf = 0, sumInf = 0;
         // root
@@ -627,7 +628,7 @@
         for (k = 1; k < NN; k++) {
           o = (base + k) * 3;
           var sk2 = k / (NN - 1);
-          var hold = 1 - 0.85 * inflN[k] * (1 - 0.8 * w);
+          var hold = 1 - 0.93 * inflN[k] * (1 - 0.8 * w);
           var kr = (k === 1 ? 0.9 : kRel) * hold;
           var ka = (1 - Math.exp(-(1.5 + 9 * (1 - sk2) * (1 - sk2)) * dt)) * hold;
           var tx2 = P[o - 3] + TWt[o] - TWt[o - 3], ty2 = P[o - 2] + TWt[o + 1] - TWt[o - 2], tz2 = P[o - 1] + TWt[o + 2] - TWt[o - 1];
