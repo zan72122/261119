@@ -425,16 +425,24 @@ function buildTrees(parent) {
   for (const t of treeList) (by[t.k] = by[t.k] || []).push(t);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), p = new THREE.Vector3();
   let seed = 3;
+  // 道に沿った区間（CHUNK m ごと）× 左右 × 道の近く/遠く に分けて InstancedMesh を作る。画面に入らない組は描かない（見た目は同じ）
+  const CHUNK = 30;
   for (const k in by) {
     const spec = TREE[k], list = by[k];
-    const crown = new THREE.InstancedMesh(crownGeo(spec, seed++), M.leaf, list.length);
-    const trunk = spec.h ? new THREE.InstancedMesh(trunkGeo(spec.h, spec.r, spec.br, seed++), M.bark, list.length) : null;
-    list.forEach((t, i) => {
-      const sy = t.s * (0.9 + hash3(t.x, 1, t.z) * 0.2);
-      m4.compose(p.set(t.x, t.y, t.z), q.setFromEuler(e.set(0, t.ry, 0)), sc.set(t.s, sy, t.s));
-      crown.setMatrixAt(i, m4); if (trunk) trunk.setMatrixAt(i, m4);
-    });
-    for (const im of [crown, trunk]) { if (!im) continue; im.frustumCulled = false; im.receiveShadow = true; im.castShadow = false; parent.add(im); }
+    const cg = crownGeo(spec, seed++), tg = spec.h ? trunkGeo(spec.h, spec.r, spec.br, seed++) : null;
+    const bins = {};
+    for (const t of list) { const key = Math.floor(t.x / CHUNK) + (t.z < 0 ? 'L' : 'R') + (Math.abs(t.z) > 12 ? 'f' : 'n'); (bins[key] = bins[key] || []).push(t); }
+    for (const b in bins) {
+      const part = bins[b];
+      const crown = new THREE.InstancedMesh(cg, M.leaf, part.length);
+      const trunk = tg ? new THREE.InstancedMesh(tg, M.bark, part.length) : null;
+      part.forEach((t, i) => {
+        const sy = t.s * (0.9 + hash3(t.x, 1, t.z) * 0.2);
+        m4.compose(p.set(t.x, t.y, t.z), q.setFromEuler(e.set(0, t.ry, 0)), sc.set(t.s, sy, t.s));
+        crown.setMatrixAt(i, m4); if (trunk) trunk.setMatrixAt(i, m4);
+      });
+      for (const im of [crown, trunk]) { if (!im) continue; im.computeBoundingSphere(); im.frustumCulled = true; im.receiveShadow = true; im.castShadow = false; parent.add(im); }
+    }
   }
 }
 
@@ -1027,6 +1035,9 @@ const trip = {
     // すすき
     const sus = buildSusuki(scene);
     S = { truck, head, headT, truckHit, boxHolder, hemi, sun, tunL, leafIM, leaves, zero, maple, dots, DOT_N, exitM, pilesIM: piles, sparkM, far, sus, parcel: null };
+    // 点いていないライトも1画素ごとに計算されるので、使う間だけ出す。組み合わせはこの3通り（core.warm で先にシェーダーを作る）
+    this.lightSets = [[tunL, head], [G.warmLight]];
+    tunL.visible = head.visible = G.warmLight.visible = false;
   },
 
   enter(c) {
@@ -1064,7 +1075,7 @@ const trip = {
     for (let i = 0; i < S.leaves.length; i++) { S.leaves[i].on = false; S.leafIM.setMatrixAt(i, S.zero); }
     S.leafIM.instanceMatrix.needsUpdate = true;
     // 家の状態
-    G.doorL.position.x = G.doorX0; M.gwin.emissiveIntensity = 0; G.warmLight.intensity = 0; G.warmM.color.set(0x2a2018);
+    G.doorL.position.x = G.doorX0; M.gwin.emissiveIntensity = 0; G.warmLight.intensity = 0; G.warmLight.visible = false; G.warmM.color.set(0x2a2018);
     G.btn.position.z = -0.03; G.lampM.emissiveIntensity = 0.3;
     S.exitM.opacity = 0; S._envMats = null; S._envK = -1;
     // 音
@@ -1258,6 +1269,7 @@ const trip = {
     core.after(3.2, () => {
       for (let i = 0; i < 10; i++) au.noise({ dur: 0.06, g: 0.09, f: 1100 + (i % 3) * 300, q: 2.2, at: i * 0.07 });
       au.noise({ dur: 0.8, g: 0.08, f: 380, q: 0.7, type: 'lowpass' });
+      G.warmLight.visible = true; S.tunL.visible = S.head.visible = false;
       core.tween(0.8, k => { G.doorL.position.x = G.doorX0 + k * 0.62; G.warmLight.intensity = k * 7; G.warmM.color.setRGB(lerp(0.16, 1.0, k), lerp(0.12, 0.72, k), lerp(0.09, 0.4, k)); }, { ease: 'out' });
     });
     core.after(4.4, () => { core.state.trip.rang = true; core.save(); core.go('home', { color: '#fff', dur: 0.9 }); });
@@ -1455,6 +1467,10 @@ const trip = {
       S.tunL.intensity = dk * 14 * (0.35 + 0.65 * Math.max(0, 1 - Math.abs(bx - lx) / 2.2));
     } else S.tunL.intensity = 0;
     S.exitM.opacity = clamp((tx - TUN0 + 2) / 6, 0, 1) * (1 - sm(TUN1 - 4, TUN1 + 1, cx));
+    // トンネルの灯りとヘッドライトは2つ一緒に出し入れする（暗くなり始めから、ヘッドライトが消えきるまで）
+    const tunOn = dk > 0.001 || S.head.intensity > 0.05 || inT;
+    S.tunL.visible = S.head.visible = tunOn && !G.warmLight.visible;
+    if (!tunOn) S.head.intensity = 0;
   },
 
   _spawnLeaf(p, v, col) {
@@ -1596,6 +1612,8 @@ function buildSusuki(scene) {
   }
   const im = new THREE.InstancedMesh(geo, M.grass, list.length); im.frustumCulled = false; im.receiveShadow = true;
   list.forEach((s, i) => { _lm.compose(_v.set(s.x, s.y, s.z), _lq.setFromEuler(_le.set(0, s.ry, 0)), _vs.set(s.s, s.s, s.s)); im.setMatrixAt(i, _lm); });
+  // 揺れても収まるよう少し大きめの境界球で、遠くにあるときは描かない
+  im.computeBoundingSphere(); im.boundingSphere.radius += 2; im.frustumCulled = true;
   scene.add(im);
   return { im, list, dirty: true };
 }

@@ -59,6 +59,8 @@ export const core = {
   state: defaultState(), scenes: {}, cur: null, busy: false,
   safe: { t: 0, b: 0, l: 0, r: 0 },
   _tweens: [], _timers: [], _raf: 0, _last: 0, _scale: 1, _ema: 16, _emaT: 0, _saveT: 0,
+  // 動的解像度の状態: _warm=計測を休む残り秒, _probe=直前に下げたときの記録, _noDown/_noUp=調整を止める残り秒
+  _warm: 3, _probe: null, _noDown: 0, _noUp: 0, _goodN: 0, _lastUp: -99,
 
   // ---------- 保存 ----------
   load() {
@@ -70,6 +72,23 @@ export const core = {
   _flush() { this._saveT = 0; try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.state)); } catch (e) { /* 保存できなくても遊べる */ } },
   resetState() { this.state = defaultState(); this._flush(); },
   restart() { this.go('pack', { reset: true, color: '#fff', dur: 0.9 }); },
+
+  // ---------- シェーダーの先読み ----------
+  // 場面に入った直後（画面が隠れている間）に、場面の全材質のシェーダーを作っておく。
+  // sc.lightSets: 途中で点け消しするライトの組。[[a, b], [c]] なら「全部消した状態」「a,b だけ」「c だけ」の3通りを作る
+  // （ライトの数が変わるとシェーダーが作り直しになり、遊んでいる最中に引っかかるため）
+  warm(sc) {
+    const r = this.renderer; if (!r || !sc || !sc.scene || !sc.camera) return;
+    const sets = sc.lightSets || [], all = sets.flat(), vis = all.map(l => l.visible);
+    try {
+      sc.scene.updateMatrixWorld();
+      for (let i = -1; i < sets.length; i++) {
+        if (i >= 0 || all.length) for (const l of all) l.visible = i >= 0 && sets[i].includes(l);
+        r.compile(sc.scene, sc.camera);
+      }
+    } catch (e) { /* 先読みできなくても描画時に作られる */ }
+    all.forEach((l, i) => { l.visible = vis[i]; });
+  },
 
   // ---------- 場面 ----------
   register(sc) { this.scenes[sc.id] = sc; },
@@ -88,6 +107,8 @@ export const core = {
       sc.enter(this);
       this._resize(true);
       if (this.low) this._applyLow();
+      this.warm(sc);
+      this._warm = 1.5; this._probe = null;
       this.busy = false;
       fade.style.opacity = '0';
     };
@@ -183,7 +204,9 @@ export const core = {
   _resize(force) {
     const ow = this.W, oh = this.H; this._measure();
     if (!force && ow === this.W && oh === this.H) return;
-    this.renderer.setPixelRatio(this._dprMax * this._scale);
+    // 画素数の上限: iPad など大きな画面で高精細のまま描くと重いので、描く画素数を約 270 万に抑える（iPhone はほぼそのまま）
+    const dpr = Math.min(this._dprMax, Math.sqrt(2.7e6 / (this.W * this.H)));
+    this.renderer.setPixelRatio(Math.max(1, dpr) * this._scale);
     this.renderer.setSize(this.W, this.H, false);
     const sc = this.cur;
     if (sc) {
@@ -232,7 +255,7 @@ export const core = {
     if (window.visualViewport) window.visualViewport.addEventListener('resize', () => self._resize());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) { self._endPointer(true); self._flush(); cancelAnimationFrame(self._raf); self._raf = 0; self.au._suspend(true); }
-      else { self.au._suspend(false); self._last = performance.now(); if (!self._raf) self._raf = requestAnimationFrame(self._tick); self._resize(); }
+      else { self.au._suspend(false); self._last = performance.now(); self._warm = 1; self._probe = null; if (!self._raf) self._raf = requestAnimationFrame(self._tick); self._resize(); }
     });
     window.addEventListener('pagehide', () => self._flush());
     c.addEventListener('webglcontextlost', e => e.preventDefault());
@@ -245,18 +268,36 @@ export const core = {
   },
   get pointerDown() { return this._pid !== null; },
 
+  // 動的解像度: フレーム間隔の平均を見て、描く画素数を上げ下げする。
+  // 下げても速くならないとき（省電力モードの 30fps 固定や、処理が CPU 側で重いとき）は元に戻して、むだに粗くしない
+  _dynRes(raw) {
+    if (this._warm > 0) { this._warm -= raw; this._ema = 16; this._emaT = 0; return; }
+    this._ema = lerp(this._ema, Math.min(raw, 0.1) * 1000, 0.08); this._emaT += raw;
+    this._noDown -= raw; this._noUp -= raw;
+    if (this._emaT < 1.0) return;
+    this._emaT = 0;
+    const e = this._ema, MIN = 0.6;
+    if (this._probe) {
+      const pr = this._probe; this._probe = null;
+      if (e > pr.ema * 0.93 && e < 40) { this._scale = pr.scale; this._resize(true); this._noDown = 20; this._warm = 0.5; return; }
+    }
+    if (e > 24 && this._scale > MIN && (this._noDown <= 0 || e > 40)) {
+      if (this.time - this._lastUp < 6) this._noUp = 1e9; // 上げてすぐ重くなった: この解像度で落ち着かせる
+      this._probe = { ema: e, scale: this._scale };
+      this._scale = Math.max(MIN, this._scale - 0.1); this._resize(true); this._warm = 0.4; this._goodN = 0;
+    } else if (e > 30 && this._scale <= MIN && !this.low && this._noDown <= 0) {
+      this.low = true; this._applyLow(); this._warm = 1.5;
+    } else if (e < 18 && this._scale < 1 && this._noUp <= 0) {
+      if (++this._goodN >= 3) { this._goodN = 0; this._scale = Math.min(1, this._scale + 0.05); this._resize(true); this._lastUp = this.time; this._warm = 0.4; }
+    } else this._goodN = 0;
+  },
+
   _tick: null,
   _frame(now) {
     this._raf = requestAnimationFrame(this._tick);
     const raw = (now - this._last) / 1000; this._last = now;
     const dt = clamp(raw, 0, 0.05); this.time += dt;
-    // 動的解像度
-    this._ema = lerp(this._ema, raw * 1000, 0.08); this._emaT += raw;
-    if (this._emaT > 1.2 && this.time > 3) {
-      this._emaT = 0;
-      if (this._ema > 40 && this._scale > 0.55) { this._scale = Math.max(0.55, this._scale - 0.12); this._resize(true); if (this._scale <= 0.7 && !this.low) { this.low = true; this._applyLow(); } }
-      else if (this._ema < 19 && this._scale < 1 && !this.low) { this._scale = Math.min(1, this._scale + 0.06); this._resize(true); }
-    }
+    this._dynRes(raw);
     if (this._saveT > 0) { this._saveT -= dt; if (this._saveT <= 0) this._flush(); }
     const tm = this._timers;
     for (let i = 0; i < tm.length; i++) { const t = tm[i]; if (t.dead) continue; t.t -= dt; if (t.t <= 0) { t.dead = true; try { t.fn(); } catch (e) { console.error(e); } } }
@@ -425,7 +466,9 @@ core.fx = {
     for (let i = 0; i < n && this._parts.length < cap; i++) {
       let s = this._pool.pop();
       if (!s) s = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
-      s.material.map = kind === 'star' ? this._texStar : this._texDot; s.material.color.setHex(colors[i % colors.length]); s.material.opacity = 1; s.material.needsUpdate = true;
+      const mp = kind === 'star' ? this._texStar : this._texDot;
+      if (s.material.map !== mp) { if (!s.material.map) s.material.needsUpdate = true; s.material.map = mp; } // 絵の有無が変わるときだけシェーダーを見直す
+      s.material.color.setHex(colors[i % colors.length]); s.material.opacity = 1;
       s.position.copy(pos); s.renderOrder = 6; sc.add(s);
       const a = Math.random() * 6.283, e = Math.random() * 0.9 + 0.2, v = speed * (0.5 + Math.random() * 0.7);
       this._parts.push({ s, vx: Math.cos(a) * v * e, vy: v * up + Math.random() * v * 0.8, vz: Math.sin(a) * v * e, t: 0, life: life * (0.7 + Math.random() * 0.6), size: size * (0.7 + Math.random() * 0.7), g: gravity, rot: (Math.random() - 0.5) * 8 });

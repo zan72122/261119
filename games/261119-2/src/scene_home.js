@@ -188,7 +188,9 @@ export default {
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02; sun.shadow.radius = 4;
     scene.add(sun, sun.target);
     R.fill = new THREE.HemisphereLight(0xfff1dc, 0x6b5238, 0.35); scene.add(R.fill);
-    R.boxLight = new THREE.PointLight(0xffc27a, 0, 0.9, 2); scene.add(R.boxLight);
+    R.boxLight = new THREE.PointLight(0xffc27a, 0, 0.9, 2); R.boxLight.visible = false; scene.add(R.boxLight);
+    // 箱を開けた一瞬だけ点けるライト。消えている間は外して描画を軽くする（シェーダーは core.warm で先に作る）
+    this.lightSets = [[R.boxLight]];
 
     // ---- 材質 ----
     const tat = tatamiTex(); tat.repeat.set(8 / 0.9, 8 / 1.8);
@@ -399,7 +401,7 @@ export default {
     R.items = {}; R.balls = []; R.fxh = []; R.drag = null; R.lock = false; R.stage = null; R.hintKey = null;
     R.flapOpen = { F: false, B: false, L: false, R: false }; R.bound = false; R.gaze = null; R.gazeT = 0; R.tapLoop = null;
     R.ribbon.visible = false; R.spotOn = 0; R.spotMat.opacity = 0; R.wallPic.visible = false;
-    R.lean = 0; R.tilt = 0; R.nod = 0; R.grandmaTap = 0; R.boxLight.intensity = 0; R.truckIn = false; R.blink = false;
+    R.lean = 0; R.tilt = 0; R.nod = 0; R.grandmaTap = 0; R.boxLight.intensity = 0; R.boxLight.visible = false; R.truckIn = false; R.blink = false;
     R.truck.group.visible = false; R.truck.setBlink(0);
     this._evening(H.celebrated ? 1 : 0);
 
@@ -828,7 +830,8 @@ export default {
     R.lock = true; core.hint.clear(); this._clearCue();
     // 箱の中から暖かい光
     R.boxLight.position.copy(BOX).add(V(0, 0.16, 0));
-    core.tween(2.6, (k, raw) => { R.boxLight.intensity = Math.sin(Math.min(1, raw * 2.2) * Math.PI / 2) * 0.6 * (1 - raw * 0.75); }, { ease: 'linear', done: () => { R.boxLight.intensity = 0; } });
+    R.boxLight.visible = true;
+    core.tween(2.6, (k, raw) => { R.boxLight.intensity = Math.sin(Math.min(1, raw * 2.2) * Math.PI / 2) * 0.6 * (1 - raw * 0.75); }, { ease: 'linear', done: () => { R.boxLight.intensity = 0; R.boxLight.visible = false; } });
     const h = fx.halo(R.parcel.group, { r: 0.32, y: 0.2, color: 0xffd890, opacity: 0.9 });
     core.after(2.2, () => h.on(false)); core.after(3.0, () => h.kill());
     core.after(0.3, () => { au.sparkle(76); fx.burst(_v.copy(BOX).add(V(0, 0.26, 0)), { n: 16, speed: 0.5, up: 0.9, colors: [0xfff3a0, 0xffffff, 0xffd080] }); });
