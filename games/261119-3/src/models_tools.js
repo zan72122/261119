@@ -230,7 +230,7 @@ export function makeCounter() {
   }
   topGeo.translate(0, -0.0225, 0.075);
   const topMat = new THREE.MeshStandardMaterial({
-    map: T.map, roughnessMap: T.rough, roughness: 1, bumpMap: T.bump, bumpScale: 0.6, metalness: 0,
+    map: T.map, color: 0xd9bf9c, roughnessMap: T.rough, roughness: 1, bumpMap: T.bump, bumpScale: 0.6, metalness: 0,
   });
   const top = M(topGeo, topMat, false, true);
   top.name = 'worktop';

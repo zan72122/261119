@@ -40,8 +40,6 @@ const PAPA_Z = -0.98;
 const PARTY_DIM = 0.1; // room level while the candles burn: Papa stays a faint silhouette
 const CAKE_GIVEN_Z = -0.40;
 const STAND_TOP = 0.060;
-const POPPER_POS = new V3(0.16, 0.20, -0.27);
-const POPPER_DIR = new V3(-0.22, 0.85, -0.45).normalize();
 const PALETTES = [
   null,
   ['#ff9ec4', '#ffd6e8', '#a8e0ff', '#fff2a8', '#c9b6ff', '#ffffff'],
@@ -258,11 +256,11 @@ export function startGame(engine, A) {
         ? { target: [0, 0.05, -0.04], pitch: 50, fitWidth: 0.5, fitHeight: 0.66 }
         : { target: [0, 0.07, -0.10], pitch: 42, fitWidth: 0.44, fitHeight: 0.54 };
       case 'PARTY': return land
-        ? { target: [0, 0.20, -0.45], pitch: 12, fitWidth: 0.60, fitHeight: 0.64 }
+        ? { target: [0, 0.185, -0.45], pitch: 13, fitWidth: 0.60, fitHeight: 0.74 }
         : { target: [0, 0.27, -0.52], pitch: 10, fitWidth: 0.56, fitHeight: 0.70 };
       default: return land
         ? { target: [0, 0.04, -0.03], pitch: 44, fitWidth: 0.60, fitHeight: 0.72 }
-        : { target: [0, 0.04, -0.04], pitch: 42, fitWidth: 0.60, fitHeight: 0.66 };
+        : { target: [0, 0.04, -0.14], pitch: 48, fitWidth: 0.58, fitHeight: 0.66 };
     }
   }
   function frameTo(name, sec) { framingName = name; engine.cam.goTo(framing(name), sec); }
@@ -1117,7 +1115,7 @@ export function startGame(engine, A) {
       S.busy = true;
       frameTo('PARTY', 2.5);
       // Papa is the subject now: a little less background blur so his face reads
-      tl.tween(2.5, (e) => { engine.bgBlur = lerp(0.7, 0.42, e); }, null, easeInOut);
+      tl.tween(2.5, (e) => { engine.bgBlur = lerp(0.7, 0.36, e); }, null, easeInOut);
       tl.after(1.0, () => A.play('door', { vol: 0.9 }));
       tl.after(1.9, () => {
         papaReset(); papa.visible = true;
@@ -1223,16 +1221,45 @@ export function startGame(engine, A) {
   }
 
   // ================================================================ 9. POP
-  const PO = { up: false, held: false, pull: 0, startY: 0, perPx: 0.001, firing: false, firstPopAt: -1, palette: 0, qBase: new THREE.Quaternion() };
-  PO.qBase.setFromUnitVectors(UP, POPPER_DIR);
+  // The party popper lies on its side on the counter (a cone rests with its mouth tipped up),
+  // mouth toward Papa, its string trailing toward the child. Pull the tab along the string.
+  const POP_TILT = Math.atan2(0.023, 0.105);
+  const PO = {
+    up: false, held: false, pull: 0, sx: 0, sy: 0, ux: 0, uy: 1, perPx: 0.001, firing: false, palette: 0,
+    land: null, home: new V3(), dH: new V3(), sDir: new V3(), slide: 1, kick: 0, hopY: 0,
+    qBase: new THREE.Quaternion(), qStr: new THREE.Quaternion(), m: new THREE.Matrix4(),
+  };
+  function popperLayout() {
+    const land = camera.aspect > 1.05;
+    PO.land = land;
+    if (land) PO.home.set(0.30, 0.0143, -0.37); else PO.home.set(0.185, 0.0143, -0.25);
+    PO.dH.set(-PO.home.x, 0, PAPA_Z + 0.03 - PO.home.z).normalize();
+    t1.copy(PO.dH).multiplyScalar(Math.cos(POP_TILT)); t1.y = Math.sin(POP_TILT);
+    PO.qBase.setFromUnitVectors(UP, t1);
+    cracker.quaternion.copy(PO.qBase);
+    // the string lies flat on the counter, toward the child and a little toward the middle
+    PO.sDir.set(-0.28, 0, 1).normalize();
+    t2.copy(PO.sDir).negate();           // string local +Y
+    t3.crossVectors(t2, UP).normalize(); // string local +X
+    PO.m.makeBasis(t3, t2, UP);
+    PO.qStr.setFromRotationMatrix(PO.m);
+    const st = cracker.userData.string;
+    st.quaternion.copy(PO.qBase).invert().multiply(PO.qStr);
+    st.scale.set(1, 1, 0.45);
+  }
+  function popperPlace() {
+    cracker.position.set(
+      PO.home.x + PO.slide * 0.6 + PO.sDir.x * 0.012 * PO.pull - PO.dH.x * PO.kick,
+      PO.home.y + PO.hopY,
+      PO.home.z + PO.sDir.z * 0.012 * PO.pull - PO.dH.z * PO.kick);
+  }
   function tabWorld(out) { cracker.updateMatrixWorld(true); return cracker.userData.tab.localToWorld(out.set(0, -0.009, 0)); }
   function popperRise() {
-    cracker.userData.setFired(false); cracker.userData.setPull(0); PO.pull = 0;
+    cracker.userData.setFired(false); cracker.userData.setPull(0); PO.pull = 0; PO.kick = 0; PO.hopY = 0;
+    popperLayout();
+    PO.slide = 1; popperPlace();
     cracker.visible = true;
-    cracker.quaternion.copy(PO.qBase);
-    t1.copy(POPPER_POS); t1.y = -0.12;
-    cracker.position.copy(t1);
-    tl.tween(0.7, (e) => { cracker.position.y = lerp(-0.12, POPPER_POS.y, e); }, () => { PO.up = true; }, backOut);
+    tl.tween(0.6, (e) => { PO.slide = 1 - e; }, () => { PO.slide = 0; PO.up = true; }, easeOut);
     A.play('slideIn', { pitch: 1.2, vol: 0.6 });
   }
   STAGES.POP = {
@@ -1240,15 +1267,18 @@ export function startGame(engine, A) {
     down(p) {
       if (!PO.up || PO.firing) return false;
       if (screenDist(tabWorld(t1)) > 80 && screenDist(t2.copy(cracker.position)) > 50) return false;
-      PO.held = true; PO.startY = p.y;
-      const d = tabWorld(t1).distanceTo(camera.position);
-      PO.perPx = 2 * d * Math.tan(camera.fov * DEG / 2) / Math.max(1, canvas.clientHeight);
+      PO.held = true; PO.sx = p.x; PO.sy = p.y;
+      // pull along the string as it looks on screen
+      toScreen(tabWorld(t1)); const ax = scr.x, ay = scr.y;
+      toScreen(t2.copy(t1).addScaledVector(PO.sDir, 0.05));
+      let ux = scr.x - ax, uy = scr.y - ay; const ul = Math.hypot(ux, uy);
+      if (ul > 1) { PO.ux = ux / ul; PO.uy = uy / ul; PO.perPx = 0.05 / ul; } else { PO.ux = 0; PO.uy = 1; PO.perPx = 0.0006; }
       A.play('tap', { vol: 0.6, pitch: 1.3 });
       return true;
     },
     move(p) {
       if (!PO.held) return;
-      const a = clamp01((p.y - PO.startY) * PO.perPx / 0.055);
+      const a = clamp01(((p.x - PO.sx) * PO.ux + (p.y - PO.sy) * PO.uy) * PO.perPx / 0.05);
       PO.pull = a; cracker.userData.setPull(a);
       if (a >= 1) firePopper();
     },
@@ -1257,15 +1287,13 @@ export function startGame(engine, A) {
       PO.held = false;
       if (PO.firing) return;
       const a0 = PO.pull;
-      tl.tween(0.35, (e, k) => {
-        const v = a0 * (1 - e) - 0.0 * k;
-        PO.pull = Math.max(0, v); cracker.userData.setPull(PO.pull);
-      }, null, easeOut);
+      tl.tween(0.35, (e) => { if (PO.firing || PO.held) return; PO.pull = a0 * (1 - e); cracker.userData.setPull(PO.pull); }, null, easeOut);
     },
     update(dt) {
-      // a gentle sway of the dangling string
-      const s = cracker.userData.string;
-      s.rotation.z = 0.06 * Math.sin(S.time * 2.1) * (1 - PO.pull);
+      if (cracker.visible) {
+        if ((camera.aspect > 1.05) !== PO.land) popperLayout();
+        popperPlace();
+      }
       if (S.photoAt >= 0 && !S.ending) {
         if (!ptr.active) S.sinceTouch += dt;
         S.sincePop += dt;
@@ -1276,9 +1304,9 @@ export function startGame(engine, A) {
     hint(h) {
       if (!PO.up || PO.firing || S.ending) return;
       h.on = true;
-      tabWorld(h.glint); h.hasGlint = true;
+      tabWorld(h.glint); h.glint.y += 0.004; h.hasGlint = true;
       if (PO.held) { h.held = true; h.spot = false; return; }
-      h.obj = cracker.userData.string; h.pos.set(h.glint.x, 0, h.glint.z); h.r = 0.05;
+      h.obj = cracker; h.pos.set(h.glint.x, 0, h.glint.z); h.r = 0.05;
       h.demo = DEMO.pop; h.demoOpts = DOPT.pop;
     },
   };
@@ -1289,19 +1317,17 @@ export function startGame(engine, A) {
     S.pops++; S.sincePop = 0;
     cracker.updateMatrixWorld(true);
     cracker.userData.mouth.getWorldPosition(t1);
-    _dir.copy(POPPER_DIR);
+    _dir.set(PO.dH.x * 0.62, 0.78, PO.dH.z * 0.62).normalize();
     confetti.burst(t1, _dir, { palette: PALETTES[PO.palette % PALETTES.length] || undefined });
     PO.palette++;
     A.play('pop');
     tl.after(0.25, () => A.play('rustle'));
     cracker.userData.setFired(true);
-    // recoil
-    const p0 = cracker.position.clone();
-    tl.tween(0.35, (e, k) => {
-      const r = Math.sin(Math.PI * k) * (1 - k) * 0.02;
-      cracker.position.set(p0.x - POPPER_DIR.x * r, p0.y - POPPER_DIR.y * r, p0.z - POPPER_DIR.z * r);
-      cracker.userData.setPull(1 - e);
-    });
+    // recoil: it jumps and skids back toward the child
+    tl.tween(0.4, (e, k) => {
+      PO.kick = 0.03 * e; PO.hopY = 0.022 * Math.sin(Math.PI * k);
+      PO.pull = 1 - e; cracker.userData.setPull(PO.pull);
+    }, () => { PO.hopY = 0; PO.pull = 0; }, easeOut);
     // Papa startles, then laughs and claps
     P.tgt.nod = -0.8; P.tgt.laugh = 0.2;
     tl.after(0.3, () => { P.tgt.nod = 0; P.tgt.laugh = 1; P.tgt.armsUp = 1; papaClap(4); P.bounceAmp = 0.7; });
@@ -1309,7 +1335,7 @@ export function startGame(engine, A) {
     tl.after(2.4, () => { P.tgt.armsUp = 0; P.tgt.laugh = 0.6; });
     if (S.pops === 1) tl.after(2.2, takePhoto);
     tl.after(1.5, () => {
-      tl.tween(0.5, (e) => { cracker.position.y = lerp(POPPER_POS.y, -0.14, e); }, () => {
+      tl.tween(0.5, (e) => { PO.slide = e; }, () => {
         cracker.visible = false;
         PO.firing = false;
         if (S.pops < 3 && !S.ending) tl.after(0.4, () => { if (!S.ending && S.stage === 'POP') popperRise(); });
@@ -1525,7 +1551,7 @@ export function startGame(engine, A) {
       return [lighterCenter(new V3()), w.add(t4.set(0, 0.0, 0.03))];
     },
     give: () => [new V3(0, 0.08, cake.position.z + 0.13), new V3(0, 0.08, cake.position.z + 0.11), new V3(0, 0.08, cake.position.z - 0.06)],
-    pop: () => { const a = tabWorld(new V3()); return [a, a.clone().add(t4.set(0, -0.05, 0.01))]; },
+    pop: () => { const a = tabWorld(new V3()); a.y += 0.01; return [a, a.clone().addScaledVector(PO.sDir, 0.07)]; },
   };
 
   // ================================================================ main update

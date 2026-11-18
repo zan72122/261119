@@ -802,6 +802,7 @@ export function createHints() {
   // ---- finger
   const fg = buildFinger();
   const fingerRoot = new THREE.Group(); fingerRoot.rotation.order = 'YXZ'; fingerRoot.visible = false;
+  fingerRoot.scale.setScalar(1.7); // life-size is only ~10 px wide on a phone: too small to notice
   const pre = new THREE.Mesh(fg.g, new THREE.MeshBasicMaterial({ colorWrite: false, vertexColors: true, alphaTest: 0.5, transparent: true }));
   pre.renderOrder = 998;
   const skinMat = new THREE.MeshStandardMaterial({
@@ -883,8 +884,8 @@ export function createHints() {
     }
     fingerRoot.rotation.set(-0.8 - lift * 2, F.yaw, 0.0);
     fingerInner.rotation.z = 0.12; // a little roll so the nail catches light
-    skinMat.opacity = 0.5 * F.fade;
-    nailMat.opacity = 0.3 * F.fade;
+    skinMat.opacity = 0.86 * F.fade;
+    nailMat.opacity = 0.6 * F.fade;
     fingerRoot.visible = F.fade > 0.002;
   }
 

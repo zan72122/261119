@@ -1048,6 +1048,7 @@ export function makePapa() {
   mesh(G.neck, skin, neckOff, 0, 0.385, -0.012).scale.set(1, 1, 0.92);
   const head = new THREE.Group(); head.name = 'papaHead';
   head.position.set(0, 0.42, 0.006); neckOff.add(head);
+  spine.scale.x = 0.86; head.scale.set(1.17 / 0.86, 1.17, 1.17);
   const headMesh = mesh(G.head, skin, head);
   mesh(G.hair, hairMat, head);
 
@@ -1078,10 +1079,10 @@ export function makePapa() {
   const eyes = [], arcs = [];
   for (const s of [-1, 1]) {
     const g = onFace(s * 0.030, 0.006, 0.0012);
-    const e = mesh(G.unitHi, eyeMat, g); e.scale.set(0.0082, 0.0056, 0.0032); eyes.push(e);
+    const e = mesh(G.unitHi, eyeMat, g); e.scale.set(0.0118, 0.0102, 0.0034); eyes.push(e);
     const a = mesh(G.arc, eyeMat, g, 0, -0.005, 0.0005); a.rotation.z = Math.PI / 2 - Math.PI * 0.39; a.visible = false; arcs.push(a);
     const bg = onFace(s * 0.032, 0.033, 0.0008);
-    const b = mesh(G.unit, browMat, bg); b.scale.set(0.015, 0.0028, 0.0025); b.rotation.z = -s * 0.14;
+    const b = mesh(G.unit, browMat, bg); b.scale.set(0.019, 0.0046, 0.0028); b.rotation.z = -s * 0.14;
   }
   // cheeks
   const cheeks = [];
@@ -1091,7 +1092,7 @@ export function makePapa() {
     c.scale.set(0.022, 0.018, 0.016); c.position.copy(c.userData.base); cheeks.push(c);
   }
   // mouths
-  const mouth = onFace(0, -0.047, 0.0006);
+  const mouth = onFace(0, -0.047, 0.0006); mouth.scale.setScalar(1.3);
   const smileM = mesh(G.smile, lipMat, mouth, 0, 0.019, 0); smileM.rotation.z = Math.PI * 1.5 - Math.PI * 0.31;
   const openG = new THREE.Group(); mouth.add(openG); openG.position.set(0, 0.006, 0.0008);
   mesh(G.mouthOpen, mouthMat, openG, 0, 0, 0.0002);
@@ -1184,7 +1185,7 @@ export function makePapa() {
     smileM.visible = smileK > 0.02; smileM.scale.setScalar(Math.max(0.001, 0.6 + 0.4 * smileK)); smileM.scale.y = Math.max(0.001, smileK);
     openG.visible = l > 0.02; openG.scale.set(lerp(0.55, 1, l), Math.max(0.001, l), 1);
     blowG.visible = b > 0.02; blowG.scale.setScalar(Math.max(0.001, b));
-    for (const e of eyes) e.scale.y = 0.0056 * lerp(1, 0.18, l);
+    for (const e of eyes) e.scale.y = 0.0102 * lerp(1, 0.16, l);
     for (const ar of arcs) { ar.visible = l > 0.25; ar.scale.setScalar(Math.max(0.001, smooth(0.25, 0.8, l))); }
     for (const c of cheeks) {
       c.position.copy(c.userData.base).addScaledVector(c.userData.n, 0.004 * b + 0.002 * l);
