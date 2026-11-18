@@ -858,21 +858,24 @@ export function createGrandma() {
   const snap = (c) => ({ P: c.P.clone(), Q: c.Q.clone(), pole: c.pole.clone(), flat: c.flat, hy: c.hy });
   for (const s of [1, -1]) { arms[s].cur = poseTarget('lap', s, {}); arms[s].from = snap(arms[s].cur); arms[s].tgt = {}; }
 
+  const _a0 = new THREE.Vector3(), _a1 = new THREE.Vector3(), _a2 = new THREE.Vector3(), _a3 = new THREE.Vector3(), _a4 = new THREE.Vector3(), _a5 = new THREE.Vector3(),
+    _a6 = new THREE.Vector3(), _a7 = new THREE.Vector3(), _a8 = new THREE.Vector3(), _a9 = new THREE.Vector3(), _aZ = new THREE.Vector3(), _aX = new THREE.Vector3();
   function solveArm(s, breathY) {
     const A = arms[s], c = A.cur;
     const S = SHOULDER(s); S.y += breathY;
-    const _zz = new THREE.Vector3(0, 0, 1).applyQuaternion(c.Q);
-    const W = c.P.clone().addScaledVector(_zz, -PALM_OFF);
-    const d = W.clone().sub(S); let dist = d.length(); const n = d.clone().divideScalar(dist || 1);
+    // 毎フレーム呼ばれるので、作業用のベクトルを使い回す（ごみを出さない）
+    const _zz = _a0.set(0, 0, 1).applyQuaternion(c.Q);
+    const W = _a1.copy(c.P).addScaledVector(_zz, -PALM_OFF);
+    const d = _a2.copy(W).sub(S); let dist = d.length(); const n = _a3.copy(d).divideScalar(dist || 1);
     dist = clamp(dist, Math.abs(L1 - L2) + 0.01, L1 + L2 - 0.002);
     const a = (L1 * L1 - L2 * L2 + dist * dist) / (2 * dist), h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
-    const q = c.pole.clone().addScaledVector(n, -c.pole.dot(n)).normalize();
-    const E = S.clone().addScaledVector(n, a).addScaledVector(q, h);
-    const Wr = S.clone().addScaledVector(n, dist);
+    const q = _a4.copy(c.pole).addScaledVector(n, -c.pole.dot(n)).normalize();
+    const E = _a5.copy(S).addScaledVector(n, a).addScaledVector(q, h);
+    const Wr = _a6.copy(S).addScaledVector(n, dist);
     // segment frames: Y along the bone, X = normal of the bending plane (keeps sphere poles on the sides)
-    const du = E.clone().sub(S).normalize(), dl = Wr.clone().sub(E).normalize();
-    const bx = new THREE.Vector3().crossVectors(du, dl); if (bx.lengthSq() < 1e-6) bx.set(s, 0, 0).cross(du).cross(du).negate(); bx.normalize();
-    const setFrame = (obj, y) => { const z = new THREE.Vector3().crossVectors(bx, y).normalize(); const x = new THREE.Vector3().crossVectors(y, z); _m.makeBasis(x, y, z); obj.quaternion.setFromRotationMatrix(_m); };
+    const du = _a7.copy(E).sub(S).normalize(), dl = _a8.copy(Wr).sub(E).normalize();
+    const bx = _a9.crossVectors(du, dl); if (bx.lengthSq() < 1e-6) bx.set(s, 0, 0).cross(du).cross(du).negate(); bx.normalize();
+    const setFrame = (obj, y) => { const z = _aZ.crossVectors(bx, y).normalize(); const x = _aX.crossVectors(y, z); _m.makeBasis(x, y, z); obj.quaternion.setFromRotationMatrix(_m); };
     A.upper.position.copy(S); setFrame(A.upper, du);
     A.lower.position.copy(E); setFrame(A.lower, dl); _v2.copy(dl);
     A.hand.position.copy(Wr).addScaledVector(_v2, 0.004); A.hand.quaternion.copy(c.Q);
