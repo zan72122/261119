@@ -451,21 +451,23 @@
         if (dd < bd) { bd = dd; gL = a; }
       }
       var r = GF.rng(777);
+      var cU = [cowN[0] * 0.5, cowN[1] * 0.5 + 1, cowN[2] * 0.5 - 0.3], cul = Math.sqrt(cU[0] * cU[0] + cU[1] * cU[1] + cU[2] * cU[2]);
+      cU[0] /= cul; cU[1] /= cul; cU[2] /= cul;
       for (var c = 0; c < NCOW; c++) {
         var phi = r() * 6.28, rad = 0.0005 + r() * 0.0025;
         var ox = (cowF[0] * Math.cos(phi) + cowB[0] * Math.sin(phi)) * rad, oy = (cowF[1] * Math.cos(phi) + cowB[1] * Math.sin(phi)) * rad, oz = (cowF[2] * Math.cos(phi) + cowB[2] * Math.sin(phi)) * rad;
         cowOff[c * 3] = ox; cowOff[c * 3 + 1] = oy; cowOff[c * 3 + 2] = oz;
         var len = 0.068 + r() * 0.010; cowLen[c] = len;
         var beta = (c / (NCOW - 1) - 0.5) * 0.45 + (r() - 0.5) * 0.1;
-        var a0 = 0.05 + r() * 0.12, a1 = 1.55 + r() * 0.35;
+        var a0 = 0.04 + r() * 0.10, a1 = 1.9 + r() * 0.4;
         var fx = cowF[0] * Math.cos(beta) + cowB[0] * Math.sin(beta), fy = cowF[1] * Math.cos(beta) + cowB[1] * Math.sin(beta), fz = cowF[2] * Math.cos(beta) + cowB[2] * Math.sin(beta);
         var px = cowRoot[0] + ox, py = cowRoot[1] + oy, pz = cowRoot[2] + oz, ds = len / (NS - 1);
         for (var j = 0; j < NS; j++) {
           var o = (c * NS + j) * 3;
           cowUp[o] = px; cowUp[o + 1] = py; cowUp[o + 2] = pz;
-          var s = (j + 0.5) / (NS - 1), ang = a0 + (a1 - a0) * Math.pow(s, 2.6);
+          var s = (j + 0.5) / (NS - 1), ang = a0 + (a1 - a0) * Math.pow(s, 4.0);
           var ca = Math.cos(ang), sa = Math.sin(ang);
-          px += (cowN[0] * ca + fx * sa) * ds; py += (cowN[1] * ca + fy * sa) * ds; pz += (cowN[2] * ca + fz * sa) * ds;
+          px += (cU[0] * ca + fx * sa) * ds; py += (cU[1] * ca + fy * sa) * ds; pz += (cU[2] * ca + fz * sa) * ds;
         }
       }
     })();
