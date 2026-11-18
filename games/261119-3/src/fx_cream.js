@@ -168,7 +168,7 @@ export function createBowlCream(opts = {}) {
   let peakNext = 0;
 
   // smears clinging to the wall after takeOut
-  const smearGeo = new THREE.SphereGeometry(1, 16, 10);
+  const smearGeo = makeSplatGeo(5);
   const smears = [];
   const srnd = mulberry32(77);
   const tmpN = new THREE.Vector3(), upV = new THREE.Vector3(0, 1, 0), tmpQ = new THREE.Quaternion(), tmpQ2 = new THREE.Quaternion();
@@ -184,7 +184,7 @@ export function createBowlCream(opts = {}) {
     tmpQ.setFromUnitVectors(upV, tmpN);
     tmpQ2.setFromAxisAngle(upV, srnd() * TAU);
     m.quaternion.copy(tmpQ).multiply(tmpQ2);
-    m.scale.set(0.006 + srnd() * 0.008, 0.0016 + srnd() * 0.001, 0.012 + srnd() * 0.012);
+    m.scale.set(0.018 + srnd() * 0.012, 0.012, 0.03 + srnd() * 0.02);
     object.add(m);
     smears.push(m);
   }
@@ -290,9 +290,10 @@ export function createBowlCream(opts = {}) {
       }
     }
     // drag the surface along with the beaters (semi-Lagrangian)
-    if (speed > 0.005) {
+    const dragW = 1 - 0.8 * k;
+    if (speed > 0.005 && dragW > 0.05) {
       T.set(H);
-      const dragK = (0.35 + 0.45 * k) * dt;
+      const dragK = 0.7 * dragW * dt;
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
         const o = j * N + i;
         if (CD[o] > lim) continue;
@@ -301,7 +302,7 @@ export function createBowlCream(opts = {}) {
         const q = Math.sqrt(dx * dx + dz * dz) / RB;
         if (q > 2.3) continue;
         const f = q < 1 ? 1 : 1 - (q - 1) / 1.3;
-        H[o] = sample(T, x - vx * dragK * f * 2.0, z - vz * dragK * f * 2.0);
+        H[o] = sample(T, x - vx * dragK * f, z - vz * dragK * f);
       }
     }
     // beaters destroy peaks they pass
@@ -339,7 +340,7 @@ export function createBowlCream(opts = {}) {
     const c2 = (c * c) / (DX * DX);
     const damp = 2.5 + 14 * k;
     const relax = k < 0.5 ? 9 + (0.8 - 9) * (k / 0.5) : 0.8 * Math.pow(1 - (k - 0.5) / 0.5, 2.5);
-    const diff = Math.min(0.2, (0.15 + 2.5 * (1 - k) * (1 - k)) * h);
+    const diff = Math.min(0.2, (0.04 + 2.5 * (1 - k) * (1 - k)) * h);
     const lim = st.R * 0.985;
     // keep the mean level (volume) stable
     let sum = 0, cnt = 0;
@@ -382,7 +383,7 @@ export function createBowlCream(opts = {}) {
       const uc = Math.min(1, u);
       const edge = 1 - uc * uc * uc * uc;
       const mound = k * 0.0065 * (1 - uc * uc) + kk * 0.0032 * LUMP[o] * edge;
-      G[o] = (H[o] + mound) * tk + (1 - tk) * 0.0007 * LUMP[o] * edge;
+      G[o] = (H[o] + mound) * tk + (1 - tk) * (0.0016 * LUMP[o] + 0.0012 * (1 - uc * uc)) * edge;
     }
     // vertices
     const e = DX * 0.9;
@@ -787,7 +788,7 @@ float cn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
   const st = {
     hasDollop: false, dropY: 0, dropV: 0, landed: false, landT: 0, time: 0,
     cov0: 0, coverage: 0, topCov: 0, sideCov: 0, finished: false, finishing: -1, dirty: true,
-    lastX: 0, lastZ: 0, lastT: -10, phase: 0,
+    lastX: 0, lastZ: 0, lastT: -10, phase: 0, wl: 0.011,
   };
 
   function topCoverage() {
@@ -819,7 +820,7 @@ float cn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
     let dx = x - st.lastX, dz = z - st.lastZ;
     const dl = Math.hypot(dx, dz);
     const moving = st.time - st.lastT < 0.25 && dl > 0.0015 && dl < 0.06;
-    if (moving) { dx /= dl; dz /= dl; } else { dx = 1; dz = 0; st.phase = Math.random() * TAU; }
+    if (moving) { dx /= dl; dz /= dl; } else { dx = 1; dz = 0; st.phase = Math.random() * TAU; st.wl = 0.009 + Math.random() * 0.006; }
     st.lastX = x; st.lastZ = z; st.lastT = st.time;
     const px = -dz, pz = dx;
     const rr = r * 1.45, rr2 = rr * rr;
@@ -837,9 +838,9 @@ float cn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
         cov[v] = Math.min(1.2, cov[v] + w * 0.42);
         if (moving) {
           const proj = vxA[v] * px + vzA[v] * pz;
-          const pat = 0.0007 * Math.sin((proj / 0.0105) * TAU + st.phase) + 0.0004 * (nz[v] - 0.5);
+          const pat = 0.00042 * Math.sin((proj / st.wl) * TAU + st.phase + 2.5 * nz[v]) + 0.0005 * (nz[v] - 0.5);
           const edgeBulge = 0.0009 * Math.exp(-((w - 0.3) * (w - 0.3)) / 0.02);
-          rid[v] += (pat - rid[v]) * w * 0.55;
+          rid[v] += (pat - rid[v]) * w * 0.45;
           rid[v] += edgeBulge * 0.25;
           if (rid[v] > 0.0016) rid[v] = 0.0016;
         }
@@ -893,7 +894,7 @@ float cn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
         else {
           const rimV = vi(NT - 1, a);
           const rim = Math.min(1, (cov[rimV] + cov[vi(NT - 1, a - 1)] + cov[vi(NT - 1, a + 1)]) / 3);
-          const s = smoothstep(-0.08, 0.08, sideFill[a] + (nz[v] - 0.5) * 0.18 - pq[p]);
+          const s = smoothstep(-0.08, 0.08, sideFill[a] + (nz[v] - 0.5) * 0.18 - pq[p]) * smoothstep(0.0, 0.06, sideFill[a]);
           c = kind[p] === 1 ? Math.max(rim * smoothstep(0.3, 0.7, rim), s) : s;
         }
         c = c + (1 - c) * f;

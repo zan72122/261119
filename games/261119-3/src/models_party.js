@@ -148,7 +148,7 @@ function spongeTextures() {
       for (let px = 0; px < W; px++) {
         const n = N.fbm(px / 24, py / 24, 4, W / 24, 1000);
         const fine = N(px / 2.2 + 300, py / 2.2, W / 2.2, 1000);
-        let r = 236, g = 196, b = 128; // pale golden crumb
+        let r = 236, g = 194, b = 118; // pale golden crumb
         const k = (n - 0.5) * 26 + (fine - 0.5) * 30;
         r += k; g += k * 0.95; b += k * 0.7;
         // crust band toward the rounded top edge
@@ -172,10 +172,10 @@ function spongeTextures() {
       }
     }
     // pores
-    for (let k = 0; k < 9000; k++) {
+    for (let k = 0; k < 5000; k++) {
       const px = R() * W, py = R() * H * 0.92 + H * 0.06;
       const rr = 0.5 + R() * R() * 2.0;
-      x.fillStyle = `rgba(150,100,42,${0.25 + R() * 0.3})`;
+      x.fillStyle = `rgba(160,112,50,${0.12 + R() * 0.25})`;
       x.beginPath(); x.ellipse(px, py, rr * (1 + R()), rr, 0, 0, Math.PI * 2); x.fill();
       if (R() < 0.5) { x.fillStyle = 'rgba(255,240,200,0.35)'; x.fillRect(px + rr, py - rr, 1, 1); }
     }
@@ -237,7 +237,7 @@ function spongeGeos() {
 export function makeSponge() {
   const tx = spongeTextures(), geo = spongeGeos();
   const mats = once('spongeMats', () => ({
-    side: new THREE.MeshStandardMaterial({ map: tx.side, bumpMap: tx.side, bumpScale: 1.2, roughness: 0.92 }),
+    side: new THREE.MeshStandardMaterial({ map: tx.side, bumpMap: tx.side, bumpScale: 0.6, roughness: 0.92 }),
     top: new THREE.MeshStandardMaterial({ map: tx.top, bumpMap: tx.top, bumpScale: 1.0, roughness: 0.88 }),
   }));
   const g = new THREE.Group();
@@ -833,9 +833,9 @@ export function makeRoom() {
   fpts.push(new THREE.Vector3(hooks[3][0], hooks[3][1], WALL_Z + 0.03));
   const fcurve = new THREE.CatmullRomCurve3(fpts);
   add(new THREE.TubeGeometry(fcurve, 160, 0.0025, 4, false), std(0x4a4a3a, 0.7), 0, 0, 0, fairy);
-  const bulbOn = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.66, 0.32).multiplyScalar(2.6) });
+  const bulbOn = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.56, 0.22).multiplyScalar(1.7) });
   const bulbGeo = new THREE.SphereGeometry(0.014, 10, 8);
-  const haloMat = new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0xffb35c, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
+  const haloMat = new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0xff9a3c, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
   const haloGeo = new THREE.PlaneGeometry(0.16, 0.16);
   const NB = 14;
   for (let k = 0; k < NB; k++) {
@@ -851,10 +851,11 @@ export function makeRoom() {
   const flagShape = new THREE.Shape(); flagShape.moveTo(-0.065, 0); flagShape.lineTo(0.065, 0); flagShape.lineTo(0, -0.15); flagShape.closePath();
   const flagGeo = new THREE.ShapeGeometry(flagShape);
   const flagCols = [0xe8484f, 0xf6c844, 0x4aa3df, 0x63bf6c, 0xf28cb3, 0xf5893a, 0x9a7ad8, 0x3cc1b8, 0xe8484f];
-  const GR = rng(12);
+  const GR = rng(12), flagMats = [];
   for (let k = 0; k < 9; k++) {
     const t = 0.08 + k * 0.84 / 8, p = gcurve.getPointAt(t), tan = gcurve.getTangentAt(t);
-    const f = add(flagGeo, std(flagCols[k], 0.8, { side: THREE.DoubleSide, emissive: flagCols[k], emissiveIntensity: 0.12 }), p.x, p.y, p.z, garland);
+    const fm = std(flagCols[k], 0.8, { side: THREE.DoubleSide, emissive: flagCols[k], emissiveIntensity: 0.12 }); flagMats.push(fm);
+    const f = add(flagGeo, fm, p.x, p.y, p.z, garland);
     f.rotation.set(-0.12 + (GR() - 0.5) * 0.1, (GR() - 0.5) * 0.3, Math.atan2(tan.y, tan.x) * 0.6 + (GR() - 0.5) * 0.08);
   }
 
@@ -876,6 +877,7 @@ export function makeRoom() {
     for (const g of glowMats) { g.m.opacity = g.maxOp * level; g.m.visible = level > 0.01; }
     glassMat.color.setScalar(lerp(0.3, 0.95, level));
     haloMat.opacity = lerp(0.85, 0.55, level);
+    for (const m of flagMats) m.emissiveIntensity = lerp(0.02, 0.12, level);
   };
   Object.defineProperty(room.userData, 'level', { get: () => level, enumerable: true });
   room.userData.setLight(1);
@@ -944,13 +946,13 @@ function papaGeos() {
     }
     const unit = new THREE.SphereGeometry(1, 20, 14);
     const unitHi = new THREE.SphereGeometry(1, 24, 18);
-    const upper = limbGeo(0.049, 0.041, 0.27);
+    const upper = limbGeo(0.047, 0.040, 0.27);
     const fore = limbGeo(0.042, 0.032, 0.235);
     const neck = limbGeo(0.056, 0.052, 0.11, 18);
     const thigh = limbGeo(0.08, 0.062, 0.40, 16);
     const shin = limbGeo(0.058, 0.045, 0.42, 14);
     const thumb = new THREE.CapsuleGeometry(0.0085, 0.026, 4, 8);
-    const collar = new THREE.TorusGeometry(0.072, 0.011, 8, 32);
+    const collar = new THREE.TorusGeometry(0.068, 0.0085, 8, 32);
     const smile = new THREE.TorusGeometry(0.021, 0.0026, 6, 20, Math.PI * 0.62);
     const arc = new THREE.TorusGeometry(0.0085, 0.0021, 6, 14, Math.PI * 0.78);
     const ring = new THREE.TorusGeometry(0.0078, 0.0036, 8, 20);
@@ -1008,7 +1010,7 @@ function ribbonGeo(points, width, twist = 0) {
 export function makePapa() {
   const G = papaGeos();
   const skin = new THREE.MeshStandardMaterial({ color: 0xd9a681, roughness: 0.6, emissive: 0x1c0c06 });
-  const cheekMat = new THREE.MeshStandardMaterial({ color: 0xd99f84, roughness: 0.6, emissive: 0x1c0a06 });
+  const cheekMat = new THREE.MeshStandardMaterial({ color: 0xd9a080, roughness: 0.6, emissive: 0x1c0b06 });
   const sweater = new THREE.MeshStandardMaterial({ color: 0x27324e, roughness: 0.96 });
   const rib = new THREE.MeshStandardMaterial({ color: 0x2c3856, roughness: 0.96 });
   const trousers = new THREE.MeshStandardMaterial({ color: 0x4d4a44, roughness: 0.9 });
@@ -1113,7 +1115,7 @@ export function makePapa() {
     mesh(G.unit, skin, hand, 0, 0.042, 0).scale.set(0.0145, 0.044, 0.041); // palm
     const fing = mesh(G.unit, skin, hand, 0.003, 0.086, -s * 0.002); fing.scale.set(0.0125, 0.034, 0.037); fing.rotation.z = 0.08;
     const th = mesh(G.thumb, skin, hand, 0.012, 0.038, s * 0.034); th.rotation.set(-s * 0.5, 0, 0.35);
-    arms.push({ s, up, fo, hand, S: new THREE.Vector3(s * 0.168, 0.205, -0.02) });
+    arms.push({ s, up, fo, hand, S: new THREE.Vector3(s * 0.163, 0.196, -0.02) });
   }
 
   // streamers + confetti
@@ -1147,23 +1149,23 @@ export function makePapa() {
   const L1 = 0.27, L2 = 0.235;
   const apply = () => {
     const lean = st.lean;
-    spine.rotation.x = lean * 0.31;
+    spine.rotation.x = lean * 0.40;
     spine.position.y = spine.userData.rest.y + st.bounce * 0.012;
-    chest.rotation.x = lean * 0.25 + st.bounce * 0.01;
-    neck.rotation.x = lean * 0.2 + st.nod * 0.21;
+    chest.rotation.x = lean * 0.20 + st.bounce * 0.01;
+    neck.rotation.x = -lean * 0.36 + st.nod * 0.21;
     neck.rotation.z = -st.headTilt * 0.21;
     // arms
     const a = st.armsUp, cl = st.clap;
     for (const A of arms) {
       const s = A.s;
       const hx = lerp(0.185, lerp(0.075, 0.017, cl), a);
-      const hy = lerp(-0.19, 0.135, a);
-      const hz = lerp(0.14, 0.13, a) + Math.sin(Math.PI * a) * 0.07;
+      const hy = lerp(-0.19, 0.14, a);
+      const hz = lerp(0.14, 0.15, a) + Math.sin(Math.PI * a) * 0.07;
       tH.set(s * hx, hy, hz);
       tD.subVectors(tH, A.S);
       let dist = clamp(tD.length(), 0.08, L1 + L2 - 0.002); tD.normalize();
       const ah = (L1 * L1 - L2 * L2 + dist * dist) / (2 * dist), hh = Math.sqrt(Math.max(0, L1 * L1 - ah * ah));
-      tP.set(s * lerp(0.25, 0.6, a), -0.8, lerp(-0.5, -0.1, a)); tP.addScaledVector(tD, -tP.dot(tD)).normalize();
+      tP.set(s * lerp(0.25, 0.18, a), -0.85, lerp(-0.5, 0.05, a)); tP.addScaledVector(tD, -tP.dot(tD)).normalize();
       tE.copy(A.S).addScaledVector(tD, ah).addScaledVector(tP, hh);
       tW.copy(A.S).addScaledVector(tD, dist);
       A.up.position.copy(A.S); tX.subVectors(tE, A.S).normalize(); A.up.quaternion.setFromUnitVectors(DOWN, tX);
