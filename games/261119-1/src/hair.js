@@ -119,7 +119,7 @@
     '  hN = normalize(N + side * aS.y * 0.35);',
     '#ifdef HAIR_COLOR',
     '  vec3 cWet = vec3(0.0065, 0.0048, 0.0040);',
-    '  vec3 cSleek = vec3(0.0115, 0.0071, 0.0048);',
+    '  vec3 cSleek = vec3(0.0135, 0.0082, 0.0055);',
     '  vec3 cFluff = vec3(0.026, 0.0158, 0.0098);',
     '  vec3 c = mix(cSleek, cFluff, fl);',
     '  c = mix(c, cWet, wet);',
@@ -842,7 +842,7 @@
         var ang = r() * 6.2832, rad = Math.sqrt(r());
         var flag = fr ? -1 : (r() < 0.06 ? 2 : 0);
         strands.push({ root: [p2[0] + nrm[0] * 0.0022, p2[1] + nrm[1] * 0.0022, p2[2] + nrm[2] * 0.0022], g: [idx[0], idx[1], idx[2]], w: [w0 / ws, w1 / ws, w2 / ws], len: fr ? 0.9 + r() * 0.1 : 0.84 + r() * 0.16, flag: flag,
-          rr: [Math.pow(r(), 0.7), Math.cos(ang) * rad, Math.sin(ang) * rad, r()], wd: (fr ? 0.0026 : 0.0031) * (0.8 + r() * 0.4), tint: r() });
+          rr: [Math.pow(r(), 0.7), Math.cos(ang) * rad, Math.sin(ang) * rad, r()], wd: (fr ? 0.0026 : 0.0031) * (0.8 + r() * 0.4) * (low ? 1.35 : 1), tint: r() });
       }
       // shuffle so that a draw range keeps an even coverage
       for (i = strands.length - 1; i > 0; i--) { var jj = Math.floor(r() * (i + 1)), tmp = strands[i]; strands[i] = strands[jj]; strands[jj] = tmp; }
