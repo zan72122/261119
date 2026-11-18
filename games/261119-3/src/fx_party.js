@@ -436,9 +436,9 @@ export function createConfetti(opts = {}) {
       quat[i * 4] = tmpQ.x; quat[i * 4 + 1] = tmpQ.y; quat[i * 4 + 2] = tmpQ.z; quat[i * 4 + 3] = tmpQ.w;
       axis.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize().multiplyScalar(6 + Math.random() * 12);
       ang[i * 3] = axis.x; ang[i * 3 + 1] = axis.y; ang[i * 3 + 2] = axis.z;
-      if (circ) { sx[i] = sy[i] = 0.007 + Math.random() * 0.003; }
-      else { sx[i] = 0.008 + Math.random() * 0.0025; sy[i] = 0.0055 + Math.random() * 0.0025; }
-      const vt = 0.3 + Math.random() * 0.25;
+      if (circ) { sx[i] = sy[i] = 0.0105 + Math.random() * 0.004; }
+      else { sx[i] = 0.012 + Math.random() * 0.004; sy[i] = 0.008 + Math.random() * 0.0035; }
+      const vt = 0.24 + Math.random() * 0.2;
       cmax[i] = 9.8 / (vt * vt);
       fl[i * 3] = Math.random() * TAU; fl[i * 3 + 1] = 3 + Math.random() * 4; fl[i * 3 + 2] = Math.random() * TAU;
       const k = KINDS[ki];
@@ -802,7 +802,7 @@ export function createHints() {
   // ---- finger
   const fg = buildFinger();
   const fingerRoot = new THREE.Group(); fingerRoot.rotation.order = 'YXZ'; fingerRoot.visible = false;
-  fingerRoot.scale.setScalar(1.7); // life-size is only ~10 px wide on a phone: too small to notice
+  fingerRoot.scale.setScalar(1.45); // life-size is only ~10 px wide on a phone: too small to notice
   const pre = new THREE.Mesh(fg.g, new THREE.MeshBasicMaterial({ colorWrite: false, vertexColors: true, alphaTest: 0.5, transparent: true }));
   pre.renderOrder = 998;
   const skinMat = new THREE.MeshStandardMaterial({

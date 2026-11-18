@@ -1317,8 +1317,9 @@ export function startGame(engine, A) {
     S.pops++; S.sincePop = 0;
     cracker.updateMatrixWorld(true);
     cracker.userData.mouth.getWorldPosition(t1);
-    _dir.set(PO.dH.x * 0.62, 0.78, PO.dH.z * 0.62).normalize();
-    confetti.burst(t1, _dir, { palette: PALETTES[PO.palette % PALETTES.length] || undefined });
+    // up and over the cake, so it flutters down through the middle of the picture
+    _dir.set(-PO.home.x, 0.52, CAKE_GIVEN_Z - PO.home.z).normalize();
+    confetti.burst(t1, _dir, { count: 120, palette: PALETTES[PO.palette % PALETTES.length] || undefined });
     PO.palette++;
     A.play('pop');
     tl.after(0.25, () => A.play('rustle'));
