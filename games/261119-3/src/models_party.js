@@ -952,7 +952,7 @@ function papaGeos() {
     const thigh = limbGeo(0.08, 0.062, 0.40, 16);
     const shin = limbGeo(0.058, 0.045, 0.42, 14);
     const thumb = new THREE.CapsuleGeometry(0.0085, 0.026, 4, 8);
-    const collar = new THREE.LatheGeometry(splinePts([[0.0565, 0.016], [0.0595, 0.0175], [0.0625, 0.014], [0.066, 0.004], [0.072, -0.006], [0.074, -0.012]], 3), 32);
+    const collar = new THREE.LatheGeometry(splinePts([[0.084, -0.004], [0.074, 0.010], [0.067, 0.021], [0.062, 0.0265], [0.0575, 0.0245]], 3), 32);
     const smile = new THREE.TorusGeometry(0.021, 0.0026, 6, 20, Math.PI * 0.62);
     const arc = new THREE.TorusGeometry(0.0085, 0.0021, 6, 14, Math.PI * 0.78);
     const ring = new THREE.TorusGeometry(0.0078, 0.0036, 8, 20);
@@ -970,6 +970,7 @@ function papaGeos() {
     const teeth = new THREE.ShapeGeometry(ts, 12);
     const tg = new THREE.Shape(); tg.absellipse(0, 0, 0.013, 0.006, 0, Math.PI * 2);
     const tongue = new THREE.ShapeGeometry(tg, 16);
+    for (const g of [mouthOpen, teeth, tongue]) { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const X = p.getX(i); p.setZ(i, -X * X / (2 * 0.07)); } }
     const dollop = new THREE.LatheGeometry(splinePts([[0, 0], [0.0105, 0.0], [0.0118, 0.003], [0.0105, 0.0068], [0.0075, 0.0095], [0.0048, 0.0118],
       [0.0024, 0.0145], [0.0006, 0.0168], [0, 0.017]], 4), 28);
     {
@@ -1092,7 +1093,7 @@ export function makePapa() {
   // mouths
   const mouth = onFace(0, -0.047, 0.0006);
   const smileM = mesh(G.smile, lipMat, mouth, 0, 0.019, 0); smileM.rotation.z = Math.PI * 1.5 - Math.PI * 0.31;
-  const openG = new THREE.Group(); mouth.add(openG); openG.position.set(0, 0.006, -0.001);
+  const openG = new THREE.Group(); mouth.add(openG); openG.position.set(0, 0.006, 0.0008);
   mesh(G.mouthOpen, mouthMat, openG, 0, 0, 0.0002);
   mesh(G.tongue, tongueMat, openG, 0, -0.015, 0.0006);
   mesh(G.teeth, teethMat, openG, 0, 0, 0.001);
