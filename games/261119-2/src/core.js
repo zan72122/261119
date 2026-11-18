@@ -80,6 +80,12 @@ export const core = {
   warm(sc) {
     const r = this.renderer; if (!r || !sc || !sc.scene || !sc.camera) return;
     const sets = sc.lightSets || [], all = sets.flat(), vis = all.map(l => l.visible);
+    // あとから場面に足される物（sc.warmObjs）と効果の粒も、いったん場面に入れて一緒に作る
+    const extra = (sc.warmObjs || []).filter(o => o && !o.parent);
+    if (!this.fx._warmSp) this.fx._warmSp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.fx._texDot, transparent: true, depthWrite: false }));
+    extra.push(this.fx._warmSp);
+    const ev = extra.map(o => o.visible);
+    for (const o of extra) { o.visible = true; sc.scene.add(o); }
     try {
       sc.scene.updateMatrixWorld();
       for (let i = -1; i < sets.length; i++) {
@@ -88,6 +94,7 @@ export const core = {
       }
     } catch (e) { /* 先読みできなくても描画時に作られる */ }
     all.forEach((l, i) => { l.visible = vis[i]; });
+    extra.forEach((o, i) => { o.removeFromParent(); o.visible = ev[i]; });
   },
 
   // ---------- 場面 ----------

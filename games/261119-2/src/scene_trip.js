@@ -1037,6 +1037,7 @@ const trip = {
     S = { truck, head, headT, truckHit, boxHolder, hemi, sun, tunL, leafIM, leaves, zero, maple, dots, DOT_N, exitM, pilesIM: piles, sparkM, far, sus, parcel: null };
     // 点いていないライトも1画素ごとに計算されるので、使う間だけ出す。組み合わせはこの3通り（core.warm で先にシェーダーを作る）
     this.lightSets = [[tunL, head], [G.warmLight]];
+    this.warmObjs = [maple];
     tunL.visible = head.visible = G.warmLight.visible = false;
   },
 
