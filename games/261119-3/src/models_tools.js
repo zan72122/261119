@@ -142,7 +142,7 @@ function counterTextures() {
     b.fillStyle = 'rgb(128,128,128)'; b.fillRect(0, 0, S, S);
     const pxX = S / 2.6, pxZ = S / 1.35;
     const board = (x, y, w, h) => {
-      const hue = 31 + R() * 6, sat = 36 + R() * 16, lit = 60 + R() * 11;
+      const hue = 30 + R() * 6, sat = 40 + R() * 16, lit = 57 + R() * 11;
       c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
       c.fillStyle = `hsl(${hue},${sat}%,${lit}%)`; c.fillRect(x, y, w, h);
       // soft tone drift along the board
