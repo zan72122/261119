@@ -688,7 +688,7 @@ const scene = {
     f.pivot.getWorldPosition(_a); this.topWorld(_b);
     core.toScreen(_a, _s0); core.toScreen(_b, _s1);
     let ux = _s1.x - _s0.x, uy = _s1.y - _s0.y; const len = Math.max(30, Math.hypot(ux, uy)); ux /= len; uy /= len;
-    this.drag = { type: 'flap', name, t0: f.t, sx: p.x, sy: p.y, ux, uy, L: Math.max(70, len * 1.5) };
+    this.drag = { type: 'flap', name, t0: f.t, sx: p.x, sy: p.y, ux, uy, L: clamp(len * 1.1, 34, 120) }; // 手前のふたは画面上の動きが短いので、短い動きでも閉まるようにする
     this.flapFx[name].ov.visible = false;
     core.au.tick();
   },
@@ -698,7 +698,7 @@ const scene = {
   },
   upFlap(d, p) {
     const f = this.parcel.flaps[d.name];
-    if (p.moved < 12 || f.t < 0.55) this.closeFlap(d.name);
+    if (p.moved < 12 || f.t < 0.72) this.closeFlap(d.name);
     else {
       const t0 = f.t; core.au.whoosh(0.4);
       core.tween(0.3, k => this.parcel.setFlap(d.name, lerp(t0, 1, k)), { ease: 'back', done: () => { if (this.stage === 'B' && this.heroFlap) this.flapFx[this.heroFlap].ov.visible = true; } });
