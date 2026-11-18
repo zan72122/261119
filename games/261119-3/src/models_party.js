@@ -899,8 +899,8 @@ function headShape(ux, uy, uz, out) {
 function papaGeos() {
   return once('papaGeo', () => {
     const v = new THREE.Vector3();
-    const head = new THREE.SphereGeometry(1, 48, 36);
-    const hair = new THREE.SphereGeometry(1, 48, 36);
+    const head = new THREE.SphereGeometry(1, 40, 30);
+    const hair = new THREE.SphereGeometry(1, 40, 30);
     {
       const p = head.attributes.position;
       for (let i = 0; i < p.count; i++) { headShape(p.getX(i), p.getY(i), p.getZ(i), v); p.setXYZ(i, v.x, v.y, v.z); }
@@ -926,7 +926,7 @@ function papaGeos() {
     }
     // torso
     const tp = splinePts([[0, -0.47], [0.13, -0.47], [0.163, -0.44], [0.170, -0.38], [0.163, -0.25], [0.160, -0.12], [0.168, 0.0], [0.176, 0.10],
-      [0.178, 0.165], [0.170, 0.21], [0.150, 0.24], [0.117, 0.262], [0.082, 0.277], [0.060, 0.285], [0, 0.288]], 4);
+      [0.178, 0.165], [0.168, 0.21], [0.146, 0.238], [0.115, 0.262], [0.088, 0.284], [0.068, 0.298], [0, 0.304]], 4);
     const torso = new THREE.LatheGeometry(tp, 40);
     {
       const p = torso.attributes.position;
@@ -944,13 +944,13 @@ function papaGeos() {
     }
     const unit = new THREE.SphereGeometry(1, 20, 14);
     const unitHi = new THREE.SphereGeometry(1, 24, 18);
-    const upper = limbGeo(0.052, 0.042, 0.27);
+    const upper = limbGeo(0.049, 0.041, 0.27);
     const fore = limbGeo(0.042, 0.032, 0.235);
-    const neck = limbGeo(0.050, 0.047, 0.11, 18);
+    const neck = limbGeo(0.056, 0.052, 0.11, 18);
     const thigh = limbGeo(0.08, 0.062, 0.40, 16);
     const shin = limbGeo(0.058, 0.045, 0.42, 14);
     const thumb = new THREE.CapsuleGeometry(0.0085, 0.026, 4, 8);
-    const collar = new THREE.TorusGeometry(0.066, 0.011, 8, 32);
+    const collar = new THREE.TorusGeometry(0.072, 0.011, 8, 32);
     const smile = new THREE.TorusGeometry(0.021, 0.0026, 6, 20, Math.PI * 0.62);
     const arc = new THREE.TorusGeometry(0.0085, 0.0021, 6, 14, Math.PI * 0.78);
     const ring = new THREE.TorusGeometry(0.0078, 0.0036, 8, 20);
@@ -1007,8 +1007,8 @@ function ribbonGeo(points, width, twist = 0) {
 
 export function makePapa() {
   const G = papaGeos();
-  const skin = new THREE.MeshStandardMaterial({ color: 0xe2b28e, roughness: 0.6, emissive: 0x1c0c06 });
-  const cheekMat = new THREE.MeshStandardMaterial({ color: 0xe6a68a, roughness: 0.6, emissive: 0x1c0a06 });
+  const skin = new THREE.MeshStandardMaterial({ color: 0xd9a681, roughness: 0.6, emissive: 0x1c0c06 });
+  const cheekMat = new THREE.MeshStandardMaterial({ color: 0xd99f84, roughness: 0.6, emissive: 0x1c0a06 });
   const sweater = new THREE.MeshStandardMaterial({ color: 0x27324e, roughness: 0.96 });
   const rib = new THREE.MeshStandardMaterial({ color: 0x2c3856, roughness: 0.96 });
   const trousers = new THREE.MeshStandardMaterial({ color: 0x4d4a44, roughness: 0.9 });
@@ -1040,7 +1040,7 @@ export function makePapa() {
   const [spine, spineOff] = pivot(papa, 0, -0.40, -0.03);
   mesh(G.torso, sweater, spineOff, 0, 0, -0.02);
   const [chest, chestOff] = pivot(spineOff, 0, -0.02, -0.03);
-  mesh(G.collar, rib, chestOff, 0, 0.283, -0.012).rotation.x = Math.PI / 2 - 0.12;
+  mesh(G.collar, rib, chestOff, 0, 0.296, -0.014).rotation.x = Math.PI / 2 - 0.12;
   const [neck, neckOff] = pivot(chestOff, 0, 0.31, -0.012);
   mesh(G.neck, skin, neckOff, 0, 0.385, -0.012).scale.set(1, 1, 0.92);
   const head = new THREE.Group(); head.name = 'papaHead';
@@ -1068,9 +1068,9 @@ export function makePapa() {
   for (const s of [-1, 1]) { const e = mesh(G.unit, skin, head, s * 0.074, -0.004, -0.006); e.scale.set(0.012, 0.03, 0.019); e.rotation.y = s * 0.3; }
   // nose
   const noseS = surf(0, -0.014);
-  const nose = mesh(G.unit, skin, head); nose.position.copy(noseS.p).add(new THREE.Vector3(0, -0.002, -0.006)); nose.scale.set(0.0125, 0.021, 0.017);
+  const nose = mesh(G.unit, skin, head); nose.position.copy(noseS.p).add(new THREE.Vector3(0, -0.002, -0.006)); nose.scale.set(0.0105, 0.021, 0.0155);
   const noseTip = new THREE.Object3D(); noseTip.position.copy(nose.position).add(new THREE.Vector3(0, -0.008, 0.0155)); head.add(noseTip);
-  for (const s of [-1, 1]) { const w = mesh(G.unit, skin, head); w.position.copy(nose.position).add(new THREE.Vector3(s * 0.009, -0.012, 0.004)); w.scale.set(0.007, 0.0065, 0.008); }
+  for (const s of [-1, 1]) { const w = mesh(G.unit, skin, head); w.position.copy(nose.position).add(new THREE.Vector3(s * 0.0075, -0.0125, 0.001)); w.scale.set(0.0055, 0.005, 0.0065); }
   // eyes
   const eyes = [], arcs = [];
   for (const s of [-1, 1]) {
@@ -1084,7 +1084,7 @@ export function makePapa() {
   const cheeks = [];
   for (const s of [-1, 1]) {
     const cs = surf(s * 0.043, -0.026);
-    const c = mesh(G.unit, cheekMat, head); c.userData.base = cs.p.clone().addScaledVector(cs.n, -0.013); c.userData.n = cs.n.clone();
+    const c = mesh(G.unit, cheekMat, head); c.userData.base = cs.p.clone().addScaledVector(cs.n, -0.0145); c.userData.n = cs.n.clone();
     c.scale.set(0.022, 0.018, 0.016); c.position.copy(c.userData.base); cheeks.push(c);
   }
   // mouths
@@ -1113,7 +1113,7 @@ export function makePapa() {
     mesh(G.unit, skin, hand, 0, 0.042, 0).scale.set(0.0145, 0.044, 0.041); // palm
     const fing = mesh(G.unit, skin, hand, 0.003, 0.086, -s * 0.002); fing.scale.set(0.0125, 0.034, 0.037); fing.rotation.z = 0.08;
     const th = mesh(G.thumb, skin, hand, 0.012, 0.038, s * 0.034); th.rotation.set(-s * 0.5, 0, 0.35);
-    arms.push({ s, up, fo, hand, S: new THREE.Vector3(s * 0.172, 0.212, -0.02) });
+    arms.push({ s, up, fo, hand, S: new THREE.Vector3(s * 0.168, 0.205, -0.02) });
   }
 
   // streamers + confetti
@@ -1156,20 +1156,19 @@ export function makePapa() {
     const a = st.armsUp, cl = st.clap;
     for (const A of arms) {
       const s = A.s;
-      const hx = lerp(0.215, lerp(0.075, 0.017, cl), a);
+      const hx = lerp(0.185, lerp(0.075, 0.017, cl), a);
       const hy = lerp(-0.19, 0.135, a);
-      const hz = lerp(0.07, 0.13, a) + Math.sin(Math.PI * a) * 0.07;
+      const hz = lerp(0.14, 0.13, a) + Math.sin(Math.PI * a) * 0.07;
       tH.set(s * hx, hy, hz);
       tD.subVectors(tH, A.S);
       let dist = clamp(tD.length(), 0.08, L1 + L2 - 0.002); tD.normalize();
       const ah = (L1 * L1 - L2 * L2 + dist * dist) / (2 * dist), hh = Math.sqrt(Math.max(0, L1 * L1 - ah * ah));
-      tP.set(s * 0.55, -0.75, lerp(-0.35, -0.1, a)); tP.addScaledVector(tD, -tP.dot(tD)).normalize();
+      tP.set(s * lerp(0.25, 0.6, a), -0.8, lerp(-0.5, -0.1, a)); tP.addScaledVector(tD, -tP.dot(tD)).normalize();
       tE.copy(A.S).addScaledVector(tD, ah).addScaledVector(tP, hh);
       tW.copy(A.S).addScaledVector(tD, dist);
       A.up.position.copy(A.S); tX.subVectors(tE, A.S).normalize(); A.up.quaternion.setFromUnitVectors(DOWN, tX);
       A.fo.position.copy(tE); tY.subVectors(tW, tE).normalize(); A.fo.quaternion.setFromUnitVectors(DOWN, tY);
       // hand basis: Y = fingers (continue forearm, bent up a little when raised), X = palm normal (medial)
-      tY.lerp(tZ.set(0, 1, 0.25).normalize(), 0.0).normalize();
       tX.set(-s, 0, 0).addScaledVector(tY, -(-s * tY.x)).normalize();
       tZ.crossVectors(tX, tY).normalize();
       tM.makeBasis(tX, tY, tZ);
