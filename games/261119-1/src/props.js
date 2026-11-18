@@ -903,7 +903,7 @@
       var seg = low ? 28 : 44;
       var g = new THREE.Group(); g.name = 'musicBox';
       g.position.set(MB[0], MB[1], MB[2]); g.rotation.y = -0.25;
-      var A0 = 0.075, B0 = 0.050, T = 0.0065, NN = 7, TRAY = 0.040, HB = 0.063;
+      var A0 = 0.075, B0 = 0.050, T = 0.0065, NN = 7, TRAY = 0.052, HB = 0.063;
       function ring(y, a, b, n, s) { return { c: [0, y, 0], u: [1, 0, 0], v: [0, 0, 1], a: a, b: b, n: n || NN, s: s }; }
       var gBase = loft([ring(0, 0.001, 0.001), ring(0, A0 - 0.004, B0 - 0.004), ring(0.0012, A0 - 0.0012, B0 - 0.0012), ring(0.004, A0, B0),
         ring(0.0590, A0, B0), ring(0.0618, A0 - 0.0010, B0 - 0.0010), ring(HB, A0 - 0.0035, B0 - 0.0035), ring(HB, A0 - T + 0.0012, B0 - T + 0.0012),
@@ -1289,7 +1289,7 @@
         var amp = 0.5 + 0.9 * GF.noise2(psi * 2.3 + 3.1, sg * 4);
         var depth = foldK * sstep(0.07, 0.22, sg) * Math.min(0.022, excess * 0.11 + 0.002) * amp;
         var room = Math.max(0, R - bodyR(y, Math.sin(psi), Math.cos(psi)) - 0.005);
-        var A = depth * fp - Math.min(room, depth) * (1 - fp);
+        var A = depth * fp - Math.min(room, depth, 0.003) * (1 - fp);
         // a thick terry towel never hugs the skull perfectly: soft low puffs everywhere
         A += 0.0045 * GF.noise2(x * 9 + 7.3, z * 9 + 1.1) + 0.003 * sstep(0.0, 0.08, sg) * (1 - sstep(0.12, 0.2, sg));
         R += A;
@@ -1469,10 +1469,12 @@
       }
       geo.setAttribute('color', new THREE.BufferAttribute(C4, 4));
       var fm = mesh(geo, M.skin, false, false); fm.renderOrder = 10; g.add(fm);
+      var rimMat = new THREE.MeshBasicMaterial({ color: 0x8a5038, side: THREE.BackSide, transparent: true, opacity: 0, depthWrite: false, vertexColors: true });
+      var rim = mesh(geo, rimMat, false, false); rim.renderOrder = 9; rim.scale.set(1.16, 1.012, 1.2); g.add(rim);
       root.add(g);
       return {
         group: g,
-        setOpacity: function (v) { v = clamp(num(v, 0), 0, 1); M.skin.opacity = 0.78 * v; g.visible = v > 0.003; }
+        setOpacity: function (v) { v = clamp(num(v, 0), 0, 1); M.skin.opacity = 0.94 * v; rimMat.opacity = 0.5 * v; g.visible = v > 0.003; }
       };
     })();
 

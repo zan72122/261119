@@ -1029,13 +1029,14 @@
       m4.makeBasis(tE, tC, tD); g.quaternion.setFromRotationMatrix(m4);
       var d = camera.position.distanceTo(g.position);
       g.position.addScaledVector(tA, 0.05);                          // hover just in front of the surface
-      g.scale.setScalar(1.5 * clamp(d / 1.9, 1, 2.2));
+      g.scale.setScalar(2.0 * clamp(d / 1.9, 1, 2.2));
       finger.setOpacity(op);
     }
 
     // =====================================================================================================
     // STAGE LOGIC
     function stageChecks() {
+      hair.setAutoDry(state.stage >= 3 || (state.stage === 2 && dr.done) ? 0.5 : 0);   // the last damp strands finish on their own
       if (state.busy || state.trans) return;
       var s = state.stage;
       if (s === 0 && wings.R.open && wings.L.open) {
@@ -1045,8 +1046,8 @@
         dirty();
       } else if (s === 2) {
         var w = hair.wetness;
-        if (w < 0.1 || (dr.blowT > 25 && w < 0.3)) {
-          state.busy = true;
+        if (w < 0.24 || (dr.blowT > 9 && w < 0.6) || dr.blowT > 15) {
+          state.busy = true; dr.done = true;
           sched(0.6, function () { snd('sparkle'); girl.headAnchor.getWorldPosition(tA); tA.y += 0.04; sparkleBurst(tA, 14, 0.14); girl.react('surprise'); });
           sched(1.5, function () { snd('giggle'); girl.react('happy'); setBaseSmile(0.5); });
           sched(2.0, function () { if (state.stage === 2) state.stage = 3; state.busy = false; dirty(); });
@@ -1178,7 +1179,7 @@
       ['R', 'L'].forEach(function (s) { var w = wings[s]; w.v = 0; w.target = 0; w.drag = false; w.open = false; w.off = 0; w.api.setOpen(0); });
       tw.state = 'head'; tw.p = 0; tw.dx = 0; tw.anim = false; tw.drag = false;
       towelP.setState('head'); towelP.setSlide(0, 0); girl.setTowelOn(true);
-      dr.held = false; dr.glide.active = false; dr.blowT = 0;
+      dr.held = false; dr.glide.active = false; dr.blowT = 0; dr.done = false;
       dryer.group.position.copy(dryer.home.position); dryer.group.quaternion.copy(dryer.home.quaternion); dryer.setOn(false); dryer.updateCord();
       audio.dryer.set(false, 0);
       br.held = false; br.glide.active = false; br.contactT = 0;

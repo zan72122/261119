@@ -486,6 +486,7 @@
     dataTex.generateMipmaps = false; dataTex.needsUpdate = true;
 
     var M = new THREE.Matrix4(), Mi = new THREE.Matrix4(), Mprev = new THREE.Matrix4(), Mpi = new THREE.Matrix4(), Dm = new THREE.Matrix4();
+    var autoDry = 0;
     var inited = false, towel = 0, towelT = 0, simT = 0, lastDt = 1 / 30, prevAx = 0, prevAy = 0, prevAz = 0;
     var wind = { on: false, ox: 0, oy: 0, oz: 0, dx: 0, dy: 0, dz: -1, s: 0, breeze: false, gust: 1 };
     var brushActiveT = -9, windActiveT = -9;
@@ -652,6 +653,7 @@
       for (g = 0; g < nG; g++) {
         var wg = wet[g];
         if (!wind.breeze) wg -= dt * infG[g] / 1.3;
+        if (autoDry > 0) wg -= dt * autoDry;
         if (spreadOn) {
           var av = 0; for (var j = 0; j < NBR; j++) av += wet[nbr[g * NBR + j]]; av /= NBR;
           if (av < wg) wg += (av - wg) * spW;
@@ -1208,6 +1210,7 @@
       get fluff() { var s = 0; for (var g = 0; g < nG; g++) s += (1 - wet[g]) * fluff[g]; return s / nG; },
       get smoothness() { return avg(smooth); },
       setTowel: function (v) { towelT = c01(num(v, 0)); },
+      setAutoDry: function (v) { autoDry = Math.max(0, num(v, 0)); },
       cowlick: cowlick,
       onPop: null,
       surfacePoint: surfacePoint,

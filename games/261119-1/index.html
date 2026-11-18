@@ -3166,7 +3166,7 @@
       var seg = low ? 28 : 44;
       var g = new THREE.Group(); g.name = 'musicBox';
       g.position.set(MB[0], MB[1], MB[2]); g.rotation.y = -0.25;
-      var A0 = 0.075, B0 = 0.050, T = 0.0065, NN = 7, TRAY = 0.040, HB = 0.063;
+      var A0 = 0.075, B0 = 0.050, T = 0.0065, NN = 7, TRAY = 0.052, HB = 0.063;
       function ring(y, a, b, n, s) { return { c: [0, y, 0], u: [1, 0, 0], v: [0, 0, 1], a: a, b: b, n: n || NN, s: s }; }
       var gBase = loft([ring(0, 0.001, 0.001), ring(0, A0 - 0.004, B0 - 0.004), ring(0.0012, A0 - 0.0012, B0 - 0.0012), ring(0.004, A0, B0),
         ring(0.0590, A0, B0), ring(0.0618, A0 - 0.0010, B0 - 0.0010), ring(HB, A0 - 0.0035, B0 - 0.0035), ring(HB, A0 - T + 0.0012, B0 - T + 0.0012),
@@ -3552,7 +3552,7 @@
         var amp = 0.5 + 0.9 * GF.noise2(psi * 2.3 + 3.1, sg * 4);
         var depth = foldK * sstep(0.07, 0.22, sg) * Math.min(0.022, excess * 0.11 + 0.002) * amp;
         var room = Math.max(0, R - bodyR(y, Math.sin(psi), Math.cos(psi)) - 0.005);
-        var A = depth * fp - Math.min(room, depth) * (1 - fp);
+        var A = depth * fp - Math.min(room, depth, 0.003) * (1 - fp);
         // a thick terry towel never hugs the skull perfectly: soft low puffs everywhere
         A += 0.0045 * GF.noise2(x * 9 + 7.3, z * 9 + 1.1) + 0.003 * sstep(0.0, 0.08, sg) * (1 - sstep(0.12, 0.2, sg));
         R += A;
@@ -3732,10 +3732,12 @@
       }
       geo.setAttribute('color', new THREE.BufferAttribute(C4, 4));
       var fm = mesh(geo, M.skin, false, false); fm.renderOrder = 10; g.add(fm);
+      var rimMat = new THREE.MeshBasicMaterial({ color: 0x8a5038, side: THREE.BackSide, transparent: true, opacity: 0, depthWrite: false, vertexColors: true });
+      var rim = mesh(geo, rimMat, false, false); rim.renderOrder = 9; rim.scale.set(1.16, 1.012, 1.2); g.add(rim);
       root.add(g);
       return {
         group: g,
-        setOpacity: function (v) { v = clamp(num(v, 0), 0, 1); M.skin.opacity = 0.78 * v; g.visible = v > 0.003; }
+        setOpacity: function (v) { v = clamp(num(v, 0), 0, 1); M.skin.opacity = 0.94 * v; rimMat.opacity = 0.5 * v; g.visible = v > 0.003; }
       };
     })();
 
@@ -5707,6 +5709,7 @@
     dataTex.generateMipmaps = false; dataTex.needsUpdate = true;
 
     var M = new THREE.Matrix4(), Mi = new THREE.Matrix4(), Mprev = new THREE.Matrix4(), Mpi = new THREE.Matrix4(), Dm = new THREE.Matrix4();
+    var autoDry = 0;
     var inited = false, towel = 0, towelT = 0, simT = 0, lastDt = 1 / 30, prevAx = 0, prevAy = 0, prevAz = 0;
     var wind = { on: false, ox: 0, oy: 0, oz: 0, dx: 0, dy: 0, dz: -1, s: 0, breeze: false, gust: 1 };
     var brushActiveT = -9, windActiveT = -9;
@@ -5873,6 +5876,7 @@
       for (g = 0; g < nG; g++) {
         var wg = wet[g];
         if (!wind.breeze) wg -= dt * infG[g] / 1.3;
+        if (autoDry > 0) wg -= dt * autoDry;
         if (spreadOn) {
           var av = 0; for (var j = 0; j < NBR; j++) av += wet[nbr[g * NBR + j]]; av /= NBR;
           if (av < wg) wg += (av - wg) * spW;
@@ -6429,6 +6433,7 @@
       get fluff() { var s = 0; for (var g = 0; g < nG; g++) s += (1 - wet[g]) * fluff[g]; return s / nG; },
       get smoothness() { return avg(smooth); },
       setTowel: function (v) { towelT = c01(num(v, 0)); },
+      setAutoDry: function (v) { autoDry = Math.max(0, num(v, 0)); },
       cowlick: cowlick,
       onPop: null,
       surfacePoint: surfacePoint,
@@ -7480,13 +7485,14 @@
       m4.makeBasis(tE, tC, tD); g.quaternion.setFromRotationMatrix(m4);
       var d = camera.position.distanceTo(g.position);
       g.position.addScaledVector(tA, 0.05);                          // hover just in front of the surface
-      g.scale.setScalar(1.5 * clamp(d / 1.9, 1, 2.2));
+      g.scale.setScalar(2.0 * clamp(d / 1.9, 1, 2.2));
       finger.setOpacity(op);
     }
 
     // =====================================================================================================
     // STAGE LOGIC
     function stageChecks() {
+      hair.setAutoDry(state.stage >= 3 || (state.stage === 2 && dr.done) ? 0.5 : 0);   // the last damp strands finish on their own
       if (state.busy || state.trans) return;
       var s = state.stage;
       if (s === 0 && wings.R.open && wings.L.open) {
@@ -7496,8 +7502,8 @@
         dirty();
       } else if (s === 2) {
         var w = hair.wetness;
-        if (w < 0.1 || (dr.blowT > 25 && w < 0.3)) {
-          state.busy = true;
+        if (w < 0.24 || (dr.blowT > 9 && w < 0.6) || dr.blowT > 15) {
+          state.busy = true; dr.done = true;
           sched(0.6, function () { snd('sparkle'); girl.headAnchor.getWorldPosition(tA); tA.y += 0.04; sparkleBurst(tA, 14, 0.14); girl.react('surprise'); });
           sched(1.5, function () { snd('giggle'); girl.react('happy'); setBaseSmile(0.5); });
           sched(2.0, function () { if (state.stage === 2) state.stage = 3; state.busy = false; dirty(); });
@@ -7629,7 +7635,7 @@
       ['R', 'L'].forEach(function (s) { var w = wings[s]; w.v = 0; w.target = 0; w.drag = false; w.open = false; w.off = 0; w.api.setOpen(0); });
       tw.state = 'head'; tw.p = 0; tw.dx = 0; tw.anim = false; tw.drag = false;
       towelP.setState('head'); towelP.setSlide(0, 0); girl.setTowelOn(true);
-      dr.held = false; dr.glide.active = false; dr.blowT = 0;
+      dr.held = false; dr.glide.active = false; dr.blowT = 0; dr.done = false;
       dryer.group.position.copy(dryer.home.position); dryer.group.quaternion.copy(dryer.home.quaternion); dryer.setOn(false); dryer.updateCord();
       audio.dryer.set(false, 0);
       br.held = false; br.glide.active = false; br.contactT = 0;
