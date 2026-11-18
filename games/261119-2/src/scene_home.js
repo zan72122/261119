@@ -38,7 +38,7 @@ const FR = {
   C: { c: V(0, 0.84, 0.3), w: 0.94, h: 1.55 },
   W: { c: V(0.1, 0.9, 0.12), w: 1.0, h: 1.6, d: V(0, 0.85, 1).normalize() },
   S: { c: V(0, 0.66, 0.42), w: 0.64, h: 1.05 },
-  T: { c: V(-0.52, 0.86, -0.3), w: 1.56, h: 1.75, d: V(0, 0.3, 1).normalize(), cp: V(-0.74, 0.9, -0.3), wp: 1.8 },
+  T: { c: V(-0.52, 0.86, -0.3), w: 1.56, h: 1.75, d: V(0, 0.3, 1).normalize(), cp: V(-0.74, 0.86, -0.3), wp: 1.8, dp: V(0, 0.17, 1).normalize() },
 };
 
 // テープの玉の置き場所（ちゃぶ台の上）
@@ -509,8 +509,8 @@ export default {
       const k = ['drawing', 'scarf', 'mikan'].find(x => R.items[x] && R.items[x].where !== 'hand') || Object.keys(R.items).find(x => R.items[x].where !== 'hand');
       if (!k) { this._frame(FR.C); return; }
       R.mainItem = k; const obj = R.items[k].obj;
-      R.fxh.push(fx.pulse(obj, { color: 0xffe0a0, amp: k === 'drawing' ? 0.14 : 0.35 }));
-      R.fxh.push(fx.halo(gm.holdPoint, { r: 0.11, opacity: 0.35 }));
+      R.fxh.push(fx.pulse(obj, { color: 0xffe0a0, amp: k === 'drawing' ? 0.14 : 0.22 }));
+      R.fxh.push(fx.halo(gm.holdPoint, { r: 0.11, opacity: 0.35, depthTest: true }));
       core.hint.set({ kind: 'drag', arc: 0.08, from: () => obj.getWorldPosition(_v).add(V(0, 0.03, 0)), to: () => gm.holdPoint.getWorldPosition(_v2), cue: c => { if (c === 1) this._cueGive(); } });
       R.gaze = () => obj.getWorldPosition(_v3);
       this._frame(FR.C);
@@ -575,8 +575,9 @@ export default {
     // 縦長で別の中心が指定されている構図（軽トラ）は寄せ先を変える
     const f = R.frTarget, port = core.aspect < 0.8;
     let c = R.fr.c, w = R.fr.w;
-    if (port && f && f.cp) { const k = R.frTw ? R.frK || 0 : 1; c = _v.copy(R.fr.c).lerp(f.cp, k); w = lerp(R.fr.w, f.wp, k); }
-    core.fitCamera(cam, { center: c, w, h: R.fr.h, dir: R.fr.d, fov: 40, pad: 1.06 });
+    let d = R.fr.d;
+    if (port && f && f.cp) { const k = R.frTw ? R.frK || 0 : 1; c = _v.copy(R.fr.c).lerp(f.cp, k); w = lerp(R.fr.w, f.wp, k); d = _v2.copy(R.fr.d).lerp(f.dp, k).normalize(); }
+    core.fitCamera(cam, { center: c, w, h: R.fr.h, dir: d, fov: 40, pad: 1.06 });
   },
 
   // ================================================================ 夕方の光
@@ -854,6 +855,7 @@ export default {
     }
     if (!o) return false;
     const it = list.find(i => i.obj === o);
+    for (const h of R.fxh) if (h.stop) h.stop();   // 運んでいる間は明滅を止める（手の光は残す）
     scene.attach(o);
     const q0 = o.quaternion.clone();
     R.drag = { type: 'item', it, obj: o, target: o.position.clone().add(V(0, 0.07, 0)), q0, plane: o.position.clone().add(V(0, 0.07, 0)), mode: 'give' };
@@ -861,7 +863,7 @@ export default {
     au.pop(1.15); if (it.kind === 'drawing') au.rustle();
     say.arms('reach');
     R.gaze = () => o.getWorldPosition(_v3);
-    R.holdHalo = fx.halo(gm.holdPoint, { r: 0.15, opacity: 0.7 });
+    R.holdHalo = fx.halo(gm.holdPoint, { r: 0.17, opacity: 0.7, depthTest: true });
     return true;
   },
   _carryMove(p) {

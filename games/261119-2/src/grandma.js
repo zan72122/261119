@@ -924,7 +924,7 @@ export function createGrandma() {
         _v.copy(st.lookTarget); neckBase.parent.updateWorldMatrix(true, false);
         neckBase.worldToLocal(_v); _v.sub(HEAD_CENTER_REL);
         ty = clamp(Math.atan2(_v.x, _v.z), -0.45, 0.45);
-        tp = clamp(-Math.atan2(_v.y, Math.hypot(_v.x, _v.z)), -0.3, 0.3);
+        tp = clamp(-Math.atan2(_v.y, Math.hypot(_v.x, _v.z)), -0.3, 0.1); // 下を向きすぎると子どもの目線から顔が見えなくなる
       }
       const kk = 1 - Math.exp(-dt * 3.2);
       st.yaw += (ty - st.yaw) * kk; st.pitch += (tp - st.pitch) * kk;

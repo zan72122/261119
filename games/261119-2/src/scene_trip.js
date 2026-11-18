@@ -151,13 +151,13 @@ function makeTextures() {
   }, { repeat: [1, 1] });
   T.cobble = C.canvas(256, 256, (g, w, h) => {
     const r = core.rng(17);
-    g.fillStyle = '#3c3a36'; g.fillRect(0, 0, w, h);
-    const n = 6, s = w / n;
+    g.fillStyle = '#4a4741'; g.fillRect(0, 0, w, h);
+    const n = 8, s = w / n;
     for (let j = 0; j < n; j++) for (let i = 0; i < n + 1; i++) {
-      const x = (i - (j % 2) * 0.5) * s + (r() - 0.5) * 5, y = j * s + (r() - 0.5) * 5, v = 110 + r() * 60 | 0, t = (r() - 0.5) * 18;
+      const x = (i - (j % 2) * 0.5) * s + (r() - 0.5) * 4, y = j * s + (r() - 0.5) * 4, v = 92 + r() * 46 | 0, t = (r() - 0.5) * 16;
       g.fillStyle = `rgb(${v + t | 0},${v | 0},${v - t - 6 | 0})`;
-      g.beginPath(); g.roundRect ? g.roundRect(x + 3, y + 3, s - 6, s - 6, 9) : g.rect(x + 3, y + 3, s - 6, s - 6); g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(x + 6, y + 5, s - 14, 4);
+      g.beginPath(); g.roundRect ? g.roundRect(x + 2, y + 2, s - 4, s - 4, 6) : g.rect(x + 2, y + 2, s - 4, s - 4); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(x + 5, y + 4, s - 10, 3);
     }
     C.grain(g, w, h, 0.09, 3);
   }, { repeat: [1, 1] });
@@ -500,7 +500,7 @@ function buildRoad(B) {
     else { if (x < BUMP0) segs.push([x, BUMP0]); if (x1 > BUMP1) segs.push([BUMP1, x1]); }
     for (const [a, b] of segs) B.add('road', worldUV(new THREE.PlaneGeometry(b - a, RHW * 2).rotateX(-Math.PI / 2).translate((a + b) / 2, 0.02, 0), 4));
   }
-  for (let x = BUMP0; x < BUMP1; x += 10) B.add('cobble', worldUV(new THREE.PlaneGeometry(10, RHW * 2).rotateX(-Math.PI / 2).translate(x + 5, 0.02, 0), 1.5));
+  for (let x = BUMP0; x < BUMP1; x += 10) B.add('cobble', worldUV(new THREE.PlaneGeometry(10, RHW * 2).rotateX(-Math.PI / 2).translate(x + 5, 0.02, 0), 1.1));
   // 継ぎ目の鉄板・目地
   for (const sx of SEAMS) B.add('metal', box(1.4, 0.025, 2.4).translate(sx, 0.03, LANE + 0.1), '#4a4b4c');
   for (let x = BUMP0 + 4; x < BUMP1; x += 7.5) B.add('vc', box(0.12, 0.012, RHW * 2).translate(x, 0.026, 0), '#2e2d2b');
@@ -911,9 +911,9 @@ function buildGrandma(B, parent) {
   // 灯籠
   {
     const x = 303.5, z = 5.6;
-    B.add('vc', cyl(0.12, 0.16, 0.7, 8).translate(x, 0.35, z), '#8f8b83');
-    B.add('vc', box(0.42, 0.32, 0.42).translate(x, 0.86, z), '#99958c');
-    B.add('vc', cyl(0.05, 0.42, 0.22, 6).translate(x, 1.13, z), '#88847b');
+    B.add('vc', cyl(0.1, 0.14, 0.7, 8).translate(x, 0.35, z), '#77746c');
+    B.add('vc', box(0.34, 0.3, 0.34).translate(x, 0.85, z), '#7f7b73');
+    B.add('vc', cyl(0.04, 0.36, 0.2, 6).translate(x, 1.1, z), '#6f6c65');
   }
   // 庭木
   tree('ever', 293.5, 7.5, 0.75); tree('maple', 307.8, 5.8, 0.65); tree('ever', 311.5, 12, 0.9); tree('kaki', 290.5, 12, 0.95);
@@ -954,7 +954,6 @@ function buildSky(parent) {
 
 // ---------------------------------------------------------------- 場面
 let S = null; // 場面の作業領域
-if (typeof window !== "undefined") window.__dbg = () => S; // DEBUG-REMOVE
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _s1 = {}, _s2 = {};
 
 const trip = {
@@ -1112,9 +1111,9 @@ const trip = {
   _driveCam(dt, snap) {
     const cp = this._camParams(), cam = this.camera;
     const tz = laneZ(S.x);
-    const kf = snap ? 1 : 1 - Math.exp(-dt * 3.2);
+    const kf = snap ? 1 : 1 - Math.exp(-dt * 5);
     S.fx = lerp(S.fx, S.x, kf); S.fz = lerp(S.fz, tz, kf);
-    if (S.x - S.fx > 3) S.fx = S.x - 3;
+    if (S.x - S.fx > 1.4) S.fx = S.x - 1.4;
     // トンネル近くは低く・まっすぐ後ろへ
     const tf = sm(TUN0 - 9, TUN0 - 1, S.fx) * (1 - sm(TUN1 + 1, TUN1 + 8, S.fx));
     const off = cp.off; off.z *= (1 - tf * 0.8); off.y = lerp(off.y, 2.9, tf);
@@ -1125,7 +1124,7 @@ const trip = {
   },
   _arrivalPose() {
     const port = core.aspect < 0.9;
-    const center = port ? V3(299.2, 1.3, 4.9) : V3(299.4, 1.3, 4.9);
+    const center = port ? V3(299.2, 1.3, 4.65) : V3(299.4, 1.3, 4.9);
     const dir = port ? V3(0.05, 0.7, -1).normalize() : V3(0.25, 0.62, -1).normalize();
     const r = core.fitCamera(this.camera, { center, w: port ? 3.7 : 9.5, h: port ? 7.6 : 7.0, dir, fov: 42, pad: 1.0, apply: false });
     return { pos: r.pos, look: center };
@@ -1200,6 +1199,7 @@ const trip = {
       } else { core.fx.wobble(S.parcel.group, { amp: 0.05, dur: 0.4 }); }
     } else if (S.stage === 'bell') {
       if (core.pick(p, [G.btnHit], 40)) this._ring();
+      else { S.blink = 0.6; core.au.knock(1.2); }
     }
   },
   onMove(p) {
@@ -1527,7 +1527,7 @@ const trip = {
       const f = (i + S.dotPh) / N, x = x0 + (i + S.dotPh) * gap;
       if (x > END + 1) { S.dots.setMatrixAt(i, S.zero); continue; }
       const fade = Math.min(1, f * 5) * Math.min(1, (1 - f) * 3);
-      const b = S.dotA * fade * (0.55 + 0.45 * Math.sin(t * 4 - i * 0.8)) * 0.9;
+      const b = S.dotA * fade * (0.55 + 0.45 * Math.sin(t * 4 - i * 0.8)) * 1.4;
       const s = 0.8 + 0.3 * fade;
       _lm.compose(_v.set(x, 0.05 + (x > BR0 && x < BR1 ? 0 : 0), laneZ(x)), _lq.identity(), _vs.set(s, 1, s));
       S.dots.setMatrixAt(i, _lm); S.dots.setColorAt(i, _c2.setRGB(b, b * 0.94, b * 0.72));

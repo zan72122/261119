@@ -388,7 +388,7 @@ core.fx = {
       if (!m.userData._pm) { m.material = m.material.clone(); m.userData._pm = true; }
       const mt = m.material, x = { m: mt, e: mt.emissive.clone(), i: mt.emissiveIntensity, em: mt.emissiveMap, c: col.clone() };
       // 光らせても元の色が白っぽく飛ばないよう、絵柄つきは自分の絵柄で、無地は自分の色寄りで光らせる
-      if (mt.map && !mt.emissiveMap) { mt.emissiveMap = mt.map; mt.needsUpdate = true; x.c.lerp(_white, 0.5); }
+      if (mt.map && !mt.emissiveMap) { mt.emissiveMap = mt.map; mt.needsUpdate = true; x.c.lerp(_white, 0.5).multiplyScalar(0.6); }
       else if (!mt.map && mt.color) x.c.copy(mt.color).lerp(col, 0.45);
       mats.push(x);
     });
