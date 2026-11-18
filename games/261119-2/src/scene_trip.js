@@ -1040,6 +1040,7 @@ const trip = {
     parcel.group.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = o.parent === parcel.group || o.userData.kind === 'flap'; } });
     parcel.group.userData.hitR = 0.42; parcel.group.userData.hitOffset = V3(0, 0.11, 0);
     S.boxHolder.add(parcel.group); parcel.group.position.set(0, 0, 0); parcel.group.rotation.set(0, 0, 0);
+    parcel.group.scale.setScalar(1.45); // 荷台の上でもシールが見えるよう、旅のあいだは少し大きく見せる
     S.maple.removeFromParent(); S.maple.visible = false;
     Object.assign(S, {
       x: clamp(+tr.x || 0, 0, END), v: 0, holding: false, prevX: 0, savedX: 0, stopT: 2, acc: 0, vPrev: 0,
