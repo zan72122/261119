@@ -324,7 +324,7 @@
   var FK = 2.6;   // horizontal texel concentration toward the face
   function gmap(a) { var s = a < 0 ? -1 : 1; a = Math.abs(a); return s * FK * a / (1 + (FK - 1) * a); }
   function ginv(g) { var s = g < 0 ? -1 : 1; g = Math.min(Math.abs(g), 1.2); return s * g / (FK - (FK - 1) * g); }
-  var SKIN_RGB = [241, 199, 172], HAIR_RGB = [26, 18, 12];
+  var SKIN_RGB = [235, 188, 158], HAIR_RGB = [26, 18, 12];
   var HAIRLINE = [[0, 0.052], [22, 0.050], [40, 0.042], [52, 0.030], [62, 0.016], [70, 0.002], [77, -0.014], [83, -0.008], [88, 0.012], [94, 0.022], [106, 0.020], [116, 0.0], [128, -0.040], [145, -0.066], [165, -0.076], [180, -0.079]];
   function hairY(psi) {
     for (var i = 1; i < HAIRLINE.length; i++) if (psi <= HAIRLINE[i][0]) {
@@ -624,7 +624,7 @@
     group.updateMatrixWorld(true);
     var skeleton = new THREE.Skeleton(rig.list);
 
-    var SK = C(0xf1c7ab), WHITE = C(0xf8f7f3), SASH = C(0xebcf7d), PEARL = C(0xf4efe4), SHOE = C(0x7b1a2c), SOLE = C(0xc9ad8b), BUCK = C(0xd8d2c8);
+    var SK = C(0xebbc9e), WHITE = C(0xf8f7f3), SASH = C(0xebcf7d), PEARL = C(0xf4efe4), SHOE = C(0x7b1a2c), SOLE = C(0xc9ad8b), BUCK = C(0xd8d2c8);
     var skinB = new Builder(), dressB = new Builder(), trimB = new Builder(), shoeB = new Builder(), headB = new Builder();
 
     // ---- torso (bodice) weights
