@@ -186,7 +186,7 @@ export function createCandleGlow() {
       light2.intensity = PER2 * cur * (1 + 0.06 * n);
       light.position.set(center.x + nV * 0.002, center.y + 0.05, center.z + n * 0.0015);
       light2.position.set(center.x, center.y + 0.08, center.z);
-      light.visible = light2.visible = cur > 0.002;
+      light.visible = light2.visible = true; // never toggle: a light-count change recompiles every lit shader (hitch)
     },
   };
 }

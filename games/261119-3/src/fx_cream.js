@@ -466,7 +466,12 @@ export function createBowlCream(opts = {}) {
         H[o] += -0.0012 * (1 - st.k) * dt * 30 * 0.1;
       }
     }
-    if (!st.taken || st.taking >= 0) simulate(dt);
+    // fixed small steps: the wave solver is only stable for h <= ~1/80 s (low frame rates blew it up)
+    if (!st.taken || st.taking >= 0) {
+      let rem = dt;
+      while (rem > 1e-5) { const h = Math.min(rem, 1 / 60); simulate(h); rem -= h; }
+      for (let o = 0; o < N * N; o++) { if (H[o] > 0.02) H[o] = 0.02; else if (H[o] < -0.02) H[o] = -0.02; }
+    }
     updateMaterial();
     rebuild();
   }
