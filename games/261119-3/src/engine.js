@@ -57,6 +57,30 @@ function easeInOut(x) {
 }
 function lerp(a, b, t) { return a + (b - a) * t; }
 
+// Change tracking: a flat list of numbers compared with last frame's list.
+// Used to skip GPU passes (shadow map, blurred background) whose inputs did not change.
+function makeSig() { return { a: [], i: 0, ch: true }; }
+function sigBegin(s) { s.i = 0; s.ch = false; }
+function sigPush(s, v) {
+  const a = s.a;
+  if (s.i < a.length) { if (a[s.i] !== v) { a[s.i] = v; s.ch = true; } }
+  else { a.push(v); s.ch = true; }
+  s.i++;
+}
+function sigMat4(s, m) { const e = m.elements; for (let k = 0; k < 16; k++) sigPush(s, e[k]); }
+function sigEnd(s) { if (s.a.length !== s.i) { s.a.length = s.i; s.ch = true; } return s.ch; }
+function sigGeo(s, o) {
+  const g = o.geometry;
+  if (!g) { sigPush(s, -1); return; }
+  sigPush(s, g.id);
+  const pa = g.attributes && g.attributes.position;
+  sigPush(s, pa ? pa.version : -1);
+  sigPush(s, g.index ? g.index.version : -1);
+  sigPush(s, g.drawRange.start); sigPush(s, g.drawRange.count);
+  if (g.isInstancedBufferGeometry) sigPush(s, g.instanceCount);
+  if (o.isInstancedMesh) { sigPush(s, o.count); sigPush(s, o.instanceMatrix.version); }
+}
+
 function createSave() {
   const mem = new Map();
   let storage = null;
@@ -255,7 +279,14 @@ export function createEngine(container) {
 
   // ---------------------------------------------------------------- sizing / dynamic resolution
   let cssW = 1, cssH = 1;
-  const dpr = () => Math.min(window.devicePixelRatio || 1, 2);
+  // device-pixel budget: phones keep their full (<=2x) density; big tablets get a slightly
+  // lower ratio so the per-pixel lighting cost stays close to a large phone's
+  const MAX_PIXELS = 2.6e6;
+  const dpr = (w = cssW, h = cssH) => {
+    const d = Math.min(window.devicePixelRatio || 1, 2);
+    const cap = Math.sqrt(MAX_PIXELS / Math.max(1, w * h));
+    return Math.max(Math.min(d, 1), Math.min(d, Math.round(cap * 100) / 100));
+  };
   let resScale = 1;
   let lastDpr = 0;
   function measure() {
@@ -266,7 +297,7 @@ export function createEngine(container) {
   }
   function applySize(force) {
     const [w, h] = measure();
-    const d = dpr();
+    const d = dpr(w, h);
     if (!force && w === cssW && h === cssH && d === lastDpr) return;
     cssW = w; cssH = h; lastDpr = d;
     container.style.width = w + 'px';
@@ -298,10 +329,15 @@ export function createEngine(container) {
     if (key.shadow.mapSize.x !== 1024) {
       key.shadow.mapSize.set(1024, 1024);
       if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; }
+      shadowForce = true;
     }
   }
   let ftEma = 1 / 60, slowTime = 0, fastTime = 0, perfWarmup = 1.0;
+  // every resolution change reallocates the drawing buffer (a hitch): after a step up that had
+  // to be undone soon, wait longer before trying again so the scale does not oscillate
+  let upDelay = 5, perfClock = 0, lastUpAt = -100;
   function updatePerf(rawDt) {
+    perfClock += rawDt;
     if (perfWarmup > 0) { perfWarmup -= rawDt; return; }
     const ft = Math.min(rawDt, 0.2);
     ftEma += (ft - ftEma) * 0.08;
@@ -309,11 +345,12 @@ export function createEngine(container) {
     else if (ftEma < 0.020) { fastTime += rawDt; slowTime = 0; }
     else { slowTime = Math.max(0, slowTime - rawDt); fastTime = 0; }
     if (slowTime > 1.5 && resScale > 0.6) {
+      if (perfClock - lastUpAt < 6) upDelay = Math.min(40, upDelay * 2);
       setResScale(Math.max(0.6, Math.round((resScale - 0.1) * 10) / 10));
       slowTime = 0; perfWarmup = 0.5;
-    } else if (fastTime > 5 && resScale < 1) {
+    } else if (fastTime > upDelay && resScale < 1) {
       setResScale(Math.min(1, Math.round((resScale + 0.1) * 10) / 10));
-      fastTime = 0; perfWarmup = 0.5;
+      fastTime = 0; perfWarmup = 0.5; lastUpAt = perfClock;
     }
   }
 
@@ -465,27 +502,88 @@ export function createEngine(container) {
   };
 
   // ---------------------------------------------------------------- rendering
+  // ---------------------------------------------------------------- change tracking
+  // The shadow map (2048², every caster) and the blurred background are re-rendered only when
+  // something they depend on changed; otherwise last frame's result is reused as is.
+  const shSig = makeSig(), bgSig = makeSig();
+  let shadowForce = true, bgForce = true, shadowUpdatedPrev = true;
+  function sigMaterial(s, m) {
+    if (Array.isArray(m)) { for (let i = 0; i < m.length; i++) sigMaterial(s, m[i]); return; }
+    if (!m) { sigPush(s, -1); return; }
+    sigPush(s, m.id); sigPush(s, m.version); sigPush(s, m.visible ? 1 : 0);
+    sigPush(s, m.opacity); sigPush(s, m.transparent ? 1 : 0); sigPush(s, m.alphaTest);
+    if (m.color) { sigPush(s, m.color.r); sigPush(s, m.color.g); sigPush(s, m.color.b); }
+    if (m.emissive) { sigPush(s, m.emissive.r); sigPush(s, m.emissive.g); sigPush(s, m.emissive.b); sigPush(s, m.emissiveIntensity); }
+    if (m.map) sigPush(s, m.map.version);
+  }
+  let shLayers = null;
+  function visitTracked(o) {
+    if (o.isLight) {
+      // lights reach the background (candles flicker, room dims)
+      sigPush(bgSig, o.id); sigPush(bgSig, o.intensity);
+      if (o.intensity === 0) return; // an unlit light may wander (flicker noise) without effect
+      sigPush(bgSig, o.color.r); sigPush(bgSig, o.color.g); sigPush(bgSig, o.color.b);
+      if (o.groundColor) { sigPush(bgSig, o.groundColor.r); sigPush(bgSig, o.groundColor.g); sigPush(bgSig, o.groundColor.b); }
+      const e = o.matrixWorld.elements; sigPush(bgSig, e[12]); sigPush(bgSig, e[13]); sigPush(bgSig, e[14]);
+      return;
+    }
+    if (!(o.isMesh || o.isLine || o.isPoints)) return;
+    if (o.castShadow && o.layers.test(shLayers)) {
+      sigPush(shSig, o.id); sigMat4(shSig, o.matrixWorld); sigGeo(shSig, o);
+      const m = o.material;
+      if (Array.isArray(m)) { for (let i = 0; i < m.length; i++) { sigPush(shSig, m[i].visible ? 1 : 0); sigPush(shSig, m[i].version); sigPush(shSig, m[i].alphaTest); } }
+      else if (m) { sigPush(shSig, m.visible ? 1 : 0); sigPush(shSig, m.version); sigPush(shSig, m.alphaTest); sigPush(shSig, m.side); }
+    }
+    if (o.layers.mask & 2) {
+      sigPush(bgSig, o.id); sigMat4(bgSig, o.matrixWorld); sigGeo(bgSig, o); sigMaterial(bgSig, o.material);
+    }
+  }
+  // returns [shadowDirty, bgDirty]; matrices must be current
+  const _dirty = [true, true];
+  function trackChanges() {
+    sigBegin(shSig); sigBegin(bgSig);
+    shLayers = key.shadow.camera.layers;
+    scene.traverseVisible(visitTracked);
+    sigMat4(bgSig, camera.matrixWorld); sigMat4(bgSig, camera.projectionMatrix);
+    sigPush(bgSig, engine.bgBlur); sigPush(bgSig, rtA.width); sigPush(bgSig, rtA.height);
+    sigPush(bgSig, scene.environmentIntensity); sigPush(bgSig, roomLevel);
+    sigPush(bgSig, scene.environment ? scene.environment.id : -1);
+    const sh = sigEnd(shSig) || shadowForce || !key.shadow.map;
+    let bg = sigEnd(bgSig) || bgForce;
+    // background props (the chair) sit inside the key light's shadow box and read the shadow map
+    // one frame late, as before: redraw them the frame after the map changed
+    if (shadowUpdatedPrev) bg = true;
+    shadowForce = false; bgForce = false;
+    _dirty[0] = sh; _dirty[1] = bg;
+    return _dirty;
+  }
+
   function render(withOverlays) {
-    // 1) background layer into low-res target
-    renderer.setRenderTarget(rtA);
-    renderer.setClearColor(BG_CLEAR, 1);
-    renderer.clear(true, true, false);
-    camera.layers.set(1);
-    renderer.render(scene, camera);
-    // 2) separable gaussian blur (ping-pong)
+    scene.updateMatrixWorld();
+    scene.matrixWorldAutoUpdate = false;
+    const dirty = trackChanges();
     const tw = rtA.width, th = rtA.height;
-    const sigma = Math.max(0, engine.bgBlur) / 0.7 * 0.016 * th;
-    if (sigma > 0.05) {
-      fsQuad.material = blurMat;
-      blurMat.uniforms.sigma.value = sigma;
-      blurMat.uniforms.tDiffuse.value = rtA.texture;
-      blurMat.uniforms.dir.value.set(1 / tw, 0);
-      renderer.setRenderTarget(rtB);
-      renderer.render(fsScene, fsCam);
-      blurMat.uniforms.tDiffuse.value = rtB.texture;
-      blurMat.uniforms.dir.value.set(0, 1 / th);
+    if (dirty[1]) { // 1-2) only when the background changed; rtA keeps last result otherwise
+      // 1) background layer into low-res target
       renderer.setRenderTarget(rtA);
-      renderer.render(fsScene, fsCam);
+      renderer.setClearColor(BG_CLEAR, 1);
+      renderer.clear(true, true, false);
+      camera.layers.set(1);
+      renderer.render(scene, camera);
+      // 2) separable gaussian blur (ping-pong)
+      const sigma = Math.max(0, engine.bgBlur) / 0.7 * 0.016 * th;
+      if (sigma > 0.05) {
+        fsQuad.material = blurMat;
+        blurMat.uniforms.sigma.value = sigma;
+        blurMat.uniforms.tDiffuse.value = rtA.texture;
+        blurMat.uniforms.dir.value.set(1 / tw, 0);
+        renderer.setRenderTarget(rtB);
+        renderer.render(fsScene, fsCam);
+        blurMat.uniforms.tDiffuse.value = rtB.texture;
+        blurMat.uniforms.dir.value.set(0, 1 / th);
+        renderer.setRenderTarget(rtA);
+        renderer.render(fsScene, fsCam);
+      }
     }
     // 3) composite to screen with tone mapping + sRGB
     renderer.setRenderTarget(null);
@@ -496,8 +594,8 @@ export function createEngine(container) {
     // 4) sharp foreground
     renderer.clearDepth();
     camera.layers.set(0);
-    renderer.shadowMap.needsUpdate = true;
-    scene.matrixWorldAutoUpdate = false;
+    renderer.shadowMap.needsUpdate = dirty[0];
+    shadowUpdatedPrev = dirty[0];
     renderer.render(scene, camera);
     scene.matrixWorldAutoUpdate = true;
     // 5) overlays
@@ -516,6 +614,8 @@ export function createEngine(container) {
     rafId = 0;
     if (!running) return;
     rafId = requestAnimationFrame(frame);
+    // high-refresh displays (120 Hz): draw every other vsync; 60/90 Hz draw every one
+    if (last && now - last < 10.5) return;
     const rawDt = last ? (now - last) / 1000 : 1 / 60;
     last = now;
     const dt = Math.min(Math.max(rawDt, 0), 0.05);
@@ -567,6 +667,7 @@ export function createEngine(container) {
     contextLost = false;
     buildEnv();
     if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; }
+    shadowForce = true; bgForce = true;
     applySize(true);
     startLoop();
   }, false);

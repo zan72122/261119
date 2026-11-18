@@ -1106,6 +1106,7 @@ export function createSplats(opts = {}) {
     const z = new THREE.Matrix4().makeScale(0, 0, 0);
     for (let k = 0; k < PER; k++) im.setMatrixAt(k, z);
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    im.count = 0; // grows with the highest slot in use (unused slots were drawn as zero-size)
     object.add(im);
     varMeshes.push(im);
   }
@@ -1163,6 +1164,7 @@ export function createSplats(opts = {}) {
     M4.compose(P, Q, S);
     im.setMatrixAt(k, M4);
     im.instanceMatrix.needsUpdate = true;
+    if (k >= im.count) im.count = k + 1;
   }
 
   function spawnLensBlob() {
@@ -1301,6 +1303,7 @@ export function createSplats(opts = {}) {
   function clear() {
     fLive.fill(0); flyMesh.count = 0;
     sUsed.fill(0); for (let s = 0; s < SMAX; s++) writeSplat(s);
+    for (const im of varMeshes) im.count = 0;
     sNext = 0;
     for (const b of blobs) { b.active = false; b.dying = false; b.mesh.visible = false; }
   }
