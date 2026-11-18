@@ -279,6 +279,7 @@ export const core = {
 core._tick = now => core._frame(now);
 
 const _v1 = new V3(), _v2 = new V3(), _up = new V3(0, 1, 0), _pl = new THREE.Plane(), _rc = new THREE.Raycaster(), _v2d = new THREE.Vector2();
+const _white = new THREE.Color(0xffffff);
 const _box = new THREE.Box3(), _sph = new THREE.Sphere(), _s1 = {}, _s2 = {};
 
 // ======================================================================
@@ -381,16 +382,20 @@ core.fx = {
   },
   // 物そのものをほんのり明滅させる（材質を複製して emissive を動かす）
   pulse(obj, o = {}) {
-    const { color = 0xffd98a, amp = 0.32, speed = 3.2 } = o; const col = new THREE.Color(color), mats = [];
+    const { color = 0xffd98a, amp = 0.4, speed = 3.2 } = o; const col = new THREE.Color(color), mats = [];
     obj.traverse(m => {
       if (!m.isMesh || !m.material || !m.material.emissive) return;
       if (!m.userData._pm) { m.material = m.material.clone(); m.userData._pm = true; }
-      mats.push({ m: m.material, e: m.material.emissive.clone(), i: m.material.emissiveIntensity });
+      const mt = m.material, x = { m: mt, e: mt.emissive.clone(), i: mt.emissiveIntensity, em: mt.emissiveMap, c: col.clone() };
+      // 光らせても元の色が白っぽく飛ばないよう、絵柄つきは自分の絵柄で、無地は自分の色寄りで光らせる
+      if (mt.map && !mt.emissiveMap) { mt.emissiveMap = mt.map; mt.needsUpdate = true; x.c.lerp(_white, 0.5); }
+      else if (!mt.map && mt.color) x.c.copy(mt.color).lerp(col, 0.45);
+      mats.push(x);
     });
     const h = { dead: false,
       stop() { if (this.dead) return; this.dead = true; this._end(); },
-      _end() { for (const x of mats) { x.m.emissive.copy(x.e); x.m.emissiveIntensity = x.i; } },
-      _up(dt, t) { const k = amp * (0.5 + 0.5 * Math.sin(t * speed)); for (const x of mats) { x.m.emissive.copy(x.e).lerp(col, 0.85); x.m.emissiveIntensity = k; } } };
+      _end() { for (const x of mats) { x.m.emissive.copy(x.e); x.m.emissiveIntensity = x.i; if (x.m.emissiveMap !== x.em) { x.m.emissiveMap = x.em; x.m.needsUpdate = true; } } },
+      _up(dt, t) { const k = amp * (0.5 + 0.5 * Math.sin(t * speed)); for (const x of mats) { x.m.emissive.copy(x.c); x.m.emissiveIntensity = k; } } };
     return this._add(h);
   },
   // こきざみに揺らす（「ここだよ」の合図）。dur 省略で止めるまで
@@ -448,10 +453,10 @@ core.hint = {
   cfg: null, idle: 0, stage: 0, _cueT: 0, _ph: 0, _sp: null, _ring: null,
   _init() {
     const tex = core.tex.canvas(256, 256, (g) => {
-      const skin = g.createLinearGradient(60, 0, 200, 256); skin.addColorStop(0, '#ffe6d2'); skin.addColorStop(1, '#f2c4a4');
+      const skin = g.createLinearGradient(60, 0, 200, 256); skin.addColorStop(0, '#ffdcc2'); skin.addColorStop(1, '#eeb28c');
       const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
-      g.shadowColor = 'rgba(60,30,10,0.35)'; g.shadowBlur = 14; g.shadowOffsetY = 5;
-      g.fillStyle = skin; g.strokeStyle = 'rgba(150,95,60,0.55)'; g.lineWidth = 3;
+      g.shadowColor = 'rgba(40,20,5,0.55)'; g.shadowBlur = 16; g.shadowOffsetY = 5;
+      g.fillStyle = skin; g.strokeStyle = 'rgba(120,70,40,0.85)'; g.lineWidth = 4;
       rr(62, 128, 142, 112, 44); g.fill();                 // 手の甲
       g.save(); g.translate(70, 170); g.rotate(-0.55); rr(-22, -52, 44, 86, 22); g.fill(); g.restore(); // 親指
       rr(100, 14, 50, 170, 25); g.fill();                  // 人さし指
@@ -464,7 +469,7 @@ core.hint = {
     });
     const m = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
     const s = this._sp = new THREE.Sprite(m); s.center.set(0.49, 0.93); s.renderOrder = 999; s.visible = false;
-    const rm = new THREE.SpriteMaterial({ map: core.tex.canvas(128, 128, (g) => { g.strokeStyle = '#fff'; g.lineWidth = 9; g.beginPath(); g.arc(64, 64, 52, 0, 6.3); g.stroke(); }), transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+    const rm = new THREE.SpriteMaterial({ map: core.tex.canvas(128, 128, (g) => { g.strokeStyle = 'rgba(90,50,20,0.5)'; g.lineWidth = 15; g.beginPath(); g.arc(64, 64, 50, 0, 6.3); g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = 9; g.beginPath(); g.arc(64, 64, 50, 0, 6.3); g.stroke(); }), transparent: true, opacity: 0, depthTest: false, depthWrite: false });
     const r = this._ring = new THREE.Sprite(rm); r.renderOrder = 998; r.visible = false;
   },
   set(cfg) { this.cfg = cfg; this.idle = 0; this.stage = 0; this._cueT = 0; this._ph = 0; this._hide(); },
@@ -504,9 +509,9 @@ core.hint = {
     const dist = _v1.distanceTo(cam.position), wpp = 2 * dist * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) / core.H; // 1px あたりのワールド長
     const px = clamp(Math.min(core.W, core.H) * 0.24, 80, 132);
     sp.position.copy(_v1); sp.position.addScaledVector(_v2.set(0, 1, 0).applyQuaternion(cam.quaternion), (1 - press) * 16 * wpp);
-    sp.scale.setScalar(px * wpp * (1 - press * 0.08)); sp.material.opacity = 0.7 * op; sp.visible = op > 0.01;
+    sp.scale.setScalar(px * wpp * (1 - press * 0.08)); sp.material.opacity = 0.86 * op; sp.visible = op > 0.01;
     ring.position.copy(_v1); const rk = c.kind === 'tap' ? press : (press * (0.6 + 0.4 * Math.sin(t * 7)));
-    ring.scale.setScalar(px * wpp * (0.35 + 0.35 * rk)); ring.material.opacity = 0.5 * op * press; ring.visible = ring.material.opacity > 0.01;
+    ring.scale.setScalar(px * wpp * (0.35 + 0.35 * rk)); ring.material.opacity = 0.8 * op * press; ring.visible = ring.material.opacity > 0.01;
   },
 };
 

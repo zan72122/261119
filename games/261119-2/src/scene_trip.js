@@ -116,11 +116,11 @@ let TX = null;
 function makeTextures() {
   const T = {}, C = core.tex;
   T.asphalt = C.mottled({ w: 256, h: 256, base: '#666561', spots: 900, alpha: 0.035, grain: 0.1, seed: 11, repeat: [1, 1] });
-  T.wall = C.mottled({ w: 256, h: 256, base: '#ececea', spots: 300, alpha: 0.05, grain: 0.05, seed: 21, repeat: [1, 1] });
+  T.wall = C.mottled({ w: 256, h: 256, base: '#ececea', spots: 300, alpha: 0.028, grain: 0.05, seed: 21, repeat: [1, 1] });
   T.ground = C.canvas(256, 256, (g, w, h) => {
     const r = core.rng(5);
     g.fillStyle = '#d0d0d0'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 220; i++) { const x = r() * w, y = r() * h, s = 6 + r() * 26; g.fillStyle = r() < 0.5 ? `rgba(255,255,255,${0.12 * r()})` : `rgba(0,0,0,${0.14 * r()})`; g.beginPath(); g.ellipse(x, y, s, s * 0.6, r() * 3, 0, 6.3); g.fill(); }
+    for (let i = 0; i < 220; i++) { const x = r() * w, y = r() * h, s = 6 + r() * 26; g.fillStyle = r() < 0.5 ? `rgba(255,255,255,${0.05 * r()})` : `rgba(0,0,0,${0.06 * r()})`; g.beginPath(); g.ellipse(x, y, s, s * 0.6, r() * 3, 0, 6.3); g.fill(); }
     for (let i = 0; i < 2600; i++) {
       const x = r() * w, y = r() * h, l = 2 + r() * 6, a = -1.57 + (r() - 0.5) * 1.2, v = 120 + r() * 135 | 0;
       g.strokeStyle = `rgba(${v},${v},${v},0.45)`; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
@@ -171,7 +171,7 @@ function makeTextures() {
     C.grain(g, w, h, 0.06, 2);
   }, { repeat: [1, 1] });
   T.bark = C.canvas(128, 256, (g, w, h) => {
-    const r = core.rng(41); g.fillStyle = '#9a9a9a'; g.fillRect(0, 0, w, h);
+    const r = core.rng(41); g.fillStyle = '#b4b2ae'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 160; i++) { const x = r() * w, v = 70 + r() * 120 | 0; g.fillStyle = `rgba(${v},${v},${v},0.5)`; g.fillRect(x, 0, 1 + r() * 4, h); }
     for (let i = 0; i < 300; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.25})`; g.fillRect(r() * w, r() * h, 3 + r() * 8, 2); }
   }, { repeat: [1, 1] });
@@ -339,7 +339,7 @@ function makeMaterials() {
   M.woodDark = std({ map: TX.woodDark, vertexColors: true, roughness: 0.85 }); 
   M.woodLight = std({ map: TX.woodLight, vertexColors: true, roughness: 0.75 }); M.woodLight.userData.cast = true;
   M.grass = std({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide });
-  M.lamp = new THREE.MeshBasicMaterial({ color: 0xffa94a, fog: false });
+  M.lamp = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 1.7, 0.45), fog: false });
   M.water = std({ color: 0x5d7f86, map: TX.water, roughness: 0.12, metalness: 0.3, envMapIntensity: 1.3 });
   M.puddle = std({ color: 0x55636a, roughness: 0.05, metalness: 0.5, envMapIntensity: 1.6 });
   M.vinyl = std({ color: 0xeef3f0, roughness: 0.3, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false });
@@ -394,12 +394,12 @@ function trunkGeo(h, r0, branches, seed) {
   const r = core.rng(seed), parts = [];
   parts.push(prep(cyl(r0 * 0.7, r0, h, 8).translate(0, h / 2, 0)));
   for (let i = 0; i < branches; i++) {
-    const a = r() * 6.28, len = h * (0.35 + r() * 0.25), g = cyl(r0 * 0.25, r0 * 0.45, len, 6);
-    g.translate(0, len / 2, 0); xf(g, 0, h * (0.6 + r() * 0.3), 0, a, 0, 0.7 + r() * 0.3);
+    const a = r() * 6.28, len = h * (0.45 + r() * 0.25), g = cyl(r0 * 0.25, r0 * 0.5, len, 6);
+    g.translate(0, len / 2, 0); xf(g, 0, h * (0.88 + r() * 0.12), 0, a, 0, 0.45 + r() * 0.3);
     parts.push(prep(g));
   }
   const g = mergeGeometries(parts, false); parts.forEach(p => p.dispose());
-  paint(g, '#9a8a76'); worldUV(g, 0.5, 1.2); return g;
+  paint(g, '#8a8070'); worldUV(g, 0.5, 1.2); return g;
 }
 const TREE = {
   maple: { h: 2.3, r: 0.17, br: 4, cy: 3.7, rx: 2.3, ry: 1.45, n: 11, rb: 0.95, pal: ['#9e1f16', '#b8291a', '#c9401f', '#d8632a', '#e08a2c'] },
@@ -457,8 +457,8 @@ function groundCol(x, z, y, out) {
   else if (x > 285 && x < 315 && z > 3.0 && z < 20) c = mix('#a8a294', '#6f7a46', n > 0.55 ? 0.8 : 0.15);
   else if (x < BUMP1 && az < 3.85) c = mix('#a29e94', '#8d8a82', n2);
   else if (x < BUMP0 && az < 22) c = mix('#7c8650', '#8f8a74', n);
-  else if (x < AV1 + 4) c = mix('#7d7c46', '#94603a', n * 1.2);
-  else if (x < BR0) c = mix('#5f5e34', '#6a5a30', n);
+  else if (x < AV1 + 4) c = mix('#6f7a40', '#94603a', n * 1.1 - 0.1);
+  else if (x < BR0) c = az < 4 ? mix('#8d8a83', '#7a7770', n) : mix('#5f5e34', '#6a5a30', n);
   else if (x < BR1 + 1) c = y < -3.0 ? mix('#8a857a', '#6f6c62', n2) : mix('#7e8a4a', '#8f8a52', n);
   else if (az < 5.2) c = mix('#86864e', '#9a8f58', n);
   else if (az < 45) {
@@ -619,21 +619,25 @@ function buildTown(B) {
     [24, 9, 7, 5.6, 2, '#f3efe6', '#4a3c34', true], [36.5, 8, 7, 5.6, 2, '#e6dccb', '#383c43', false], [48.5, 7, 7, 2.9, 1, '#ece5d8', '#7a3a2a', false],
     [64, 8, 7, 2.9, 1, '#e9e2d2', '#34383e', false],
   ];
-  const SET = 6.6;
+  const SET = 6.6, gapsL = [[25.3, 30.6], [64.5, 77]], gapsR = [[55, 59], [70, 999]];
   for (const [cx, w, d, h, f, wall, roof, bal] of L) {
     house(B, cx, -(SET + d / 2), 0, { w, d, h, floors: f, wall, roof, bal });
-    const doorX = cx - w / 2 + 1.2;
-    blockWall(B, cx - w / 2 - 0.7, doorX - 0.7, -3.85); blockWall(B, doorX + 0.7, cx + w / 2 - 2.6, -3.85);
+    gapsL.push([cx - w / 2 + 0.6, cx - w / 2 + 1.8], [cx + w / 2 - 2.8, cx + w / 2 + 0.2]);
     tree(hash3(cx, 2, 2) > 0.5 ? 'maple' : 'ever', cx + w / 2 - 0.6, -(SET + d + 1.6), 0.8);
     tree('hedge', cx + w / 2 - 1.2, -4.6, 0.9, 0);
   }
   for (const [cx, w, d, h, f, wall, roof, bal] of R) {
     house(B, cx, SET + d / 2, Math.PI, { w, d, h, floors: f, wall, roof, bal });
-    const doorX = cx + w / 2 - 1.2;
-    blockWall(B, cx - w / 2 + 2.6, doorX - 0.7, 3.85); blockWall(B, doorX + 0.7, cx + w / 2 + 0.7, 3.85);
+    gapsR.push([cx + w / 2 - 1.8, cx + w / 2 - 0.6], [cx - w / 2 - 0.2, cx - w / 2 + 2.8]);
     tree(hash3(cx, 5, 2) > 0.4 ? 'zelkova' : 'ever', cx - w / 2 + 0.8, SET + d + 1.8, 0.85);
     tree('hedge', cx - w / 2 + 1.3, 4.6, 0.9, 0);
   }
+  const walls = (gaps, z, x0, x1) => {
+    gaps.sort((a, b) => a[0] - b[0]); let x = x0;
+    for (const [a, b] of gaps) { if (a > x) blockWall(B, x, Math.min(a, x1), z, 0.95); x = Math.max(x, b); if (x >= x1) break; }
+    if (x < x1) blockWall(B, x, x1, z, 0.95);
+  };
+  walls(gapsL, -3.85, -22, 86); walls(gapsR, 3.85, -22, 70);
   // 自販機（左側, 正面 +Z）
   for (const [x, c] of [[27.4, '#f0f0ee'], [28.5, '#c43a2a']]) {
     B.add('gloss', box(1.0, 1.83, 0.75).translate(x, 0.915, -3.55), c);
@@ -669,7 +673,7 @@ function buildTown(B) {
     if (prev) for (let i = 0; i < 4; i++) wire(B, prev[i], tips[i], 0.45);
     prev = tips;
   }
-  const poles2 = [244, 270, 296, 322];
+  const poles2 = [246, 272];
   prev = null;
   for (const x of poles2) {
     const tips = pole(B, x, -3.6);
@@ -688,8 +692,8 @@ function buildTown(B) {
 function buildAvenue(B) {
   let i = 0;
   for (let x = AV0 + 1; x < AV1; x += 4.6, i++) {
-    tree(i % 2 ? 'ginkgo' : 'maple', x, -4.7 + hash3(x, 1, 1) * 0.4, 1.25);
-    tree(i % 2 ? 'maple' : 'ginkgo', x + 2.3, 4.7 + hash3(x, 2, 1) * 0.4, 1.25);
+    tree(i % 2 ? 'ginkgo' : 'maple', x, -4.7 + hash3(x, 1, 1) * 0.4, 1.05);
+    tree(i % 2 ? 'maple' : 'ginkgo', x + 2.3, 4.7 + hash3(x, 2, 1) * 0.4, 1.05);
     tree(i % 3 ? 'maple' : 'zelkova', x + 1.2, -9 - hash3(x, 3, 1) * 3, 1.2);
     tree(i % 3 ? 'ginkgo' : 'zelkova', x + 3.0, 9 + hash3(x, 4, 1) * 3, 1.2);
   }
@@ -843,17 +847,18 @@ function buildGrandma(B, parent) {
   for (let x = 301.9; x <= x1; x += 1.925) B.add('woodLight', box(0.12, hw, 0.12).translate(x, base + hw / 2, zf + 0.06), '#d9c8ae');
   B.add('woodLight', box(x1 - 301.8, 0.18, 0.14).translate((301.8 + x1) / 2, base + hw - 0.09, zf + 0.06), '#d9c8ae');
   // 障子（明かりがつく）
-  for (let i = 0; i < 4; i++) B.add('gwin', quad(1.9, 1.85, 'shoji').translate(302.8 + i * 1.92, base + 0.95, zf + 1.012));
+  for (let i = 0; i < 4; i++) B.add('gwin', quad(1.9, 1.85, 'shoji').rotateY(Math.PI).translate(302.8 + i * 1.92, base + 0.95, zf + 1.0 - 0.012));
   // 左の部屋の窓
-  B.add('gwin', quad(1.7, 1.0, 'shoji').translate(296.9, base + 1.55, zf + 0.012));
+  B.add('gwin', quad(1.7, 1.0, 'shoji').rotateY(Math.PI).translate(296.9, base + 1.55, zf - 0.012));
   // 玄関（引き戸 2 枚: 左は動く）
   const gx = 299.45, gw = 1.9, gy = base + 1.02;
-  B.add('vc', box(gw + 0.3, 0.12, 0.1).translate(gx, base + 2.13, zf + 0.05), '#4e3522');
-  B.add('gwin', quad(gw / 2, 2.0, 'genkanR').translate(gx + gw / 4, gy, zf + 0.02));
-  const doorL = new THREE.Mesh(prep(quad(gw / 2, 2.0, 'genkanL')), M.gwin);
-  doorL.position.set(gx - gw / 4, gy, zf + 0.035); parent.add(doorL); G.doorL = doorL; G.doorX0 = doorL.position.x;
+  B.add('vc', box(gw + 0.3, 0.12, 0.1).translate(gx, base + 2.06, zf - 0.05), '#4e3522');
+  for (const s2 of [1, -1]) B.add('vc', box(0.1, 2.1, 0.1).translate(gx + s2 * (gw / 2 + 0.08), base + 1.02, zf - 0.05), '#4e3522');
+  B.add('gwin', quad(gw / 2, 2.0, 'genkanR').rotateY(Math.PI).translate(gx + gw / 4, gy, zf - 0.02));
+  const doorL = new THREE.Mesh(prep(quad(gw / 2, 2.0, 'genkanL').rotateY(Math.PI)), M.gwin);
+  doorL.position.set(gx - gw / 4, gy, zf - 0.035); parent.add(doorL); G.doorL = doorL; G.doorX0 = doorL.position.x;
   const warmM = new THREE.MeshBasicMaterial({ color: 0x2a2018 });
-  const warm = new THREE.Mesh(new THREE.PlaneGeometry(gw / 2 - 0.05, 1.95), warmM); warm.position.set(gx - gw / 4, gy, zf + 0.015); parent.add(warm); G.warmM = warmM;
+  const warm = new THREE.Mesh(new THREE.PlaneGeometry(gw / 2 - 0.05, 1.95).rotateY(Math.PI), warmM); warm.position.set(gx - gw / 4, gy, zf - 0.008); parent.add(warm); G.warmM = warmM;
   B.add('vc', box(2.6, 0.2, 1.3).translate(gx, 0.1, zf - 0.6), '#9e9a92'); // 玄関前の石段
   B.add('vc', box(2.0, 0.18, 0.6).translate(gx, base - 0.09, zf - 0.2), '#a8a49b');
   // 庇
@@ -865,7 +870,7 @@ function buildGrandma(B, parent) {
     g.rotateX(s * a).translate(cx, base + hw + rh - drop / 2 + 0.1, cz + s * run / 2);
     B.add('roof', g, '#3a3d42');
   }
-  B.add('roof', cyl(0.2, 0.2, w + ov * 2 + 0.1, 10).rotateZ(Math.PI / 2).translate(cx, base + hw + rh + 0.2, cz), '#2c2e32');
+  B.add('roof', cyl(0.17, 0.17, w + ov * 2 + 0.1, 10).rotateZ(Math.PI / 2).translate(cx, base + hw + rh + 0.12, cz), '#2c2e32');
   for (const s of [1, -1]) {
     const g = new THREE.BufferGeometry(), y0 = base + hw, xx = s > 0 ? x1 : x0;
     const A = [xx, y0, zf], Bv = [xx, y0, zb], Cv = [xx, y0 + rh, cz];
@@ -884,8 +889,8 @@ function buildGrandma(B, parent) {
     B.add('vc', box(0.42, 0.09, 0.42).translate(x, 1.49, WALLZ), '#77746d');
   };
   pillar(297.7); pillar(300.85);
-  // 呼び鈴（右の門柱の道側の面 = -Z 向き）
-  const btnBase = new THREE.Group(); btnBase.position.set(300.85, 1.02, WALLZ - 0.172); parent.add(btnBase);
+  // 呼び鈴（荷台の後ろ側の門柱の、道側の面 = -Z 向き）
+  const btnBase = new THREE.Group(); btnBase.position.set(297.7, 1.02, WALLZ - 0.172); parent.add(btnBase);
   const plate = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.24, 0.02), new THREE.MeshStandardMaterial({ color: 0xe8e3d6, roughness: 0.4 }));
   plate.position.z = -0.01; plate.castShadow = true; btnBase.add(plate);
   const lens = new THREE.Mesh(new THREE.CircleGeometry(0.018, 16), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1 }));
@@ -921,8 +926,8 @@ function buildSky(parent) {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(460, 32, 16), new THREE.MeshBasicMaterial({ map: TX.sky, side: THREE.BackSide, fog: false, depthWrite: false }));
   sky.renderOrder = -2; parent.add(sky);
   const layers = [
-    { R: 190, base: 16, amp: 22, top: ['#5d5a3c', '#7a4a2e', '#4e5a34', '#86602e'], haze: 0.35, seed: 1 },
-    { R: 270, base: 30, amp: 34, top: ['#6f7a7c', '#7a7a74', '#6a7478'], haze: 0.55, seed: 2 },
+    { R: 190, base: 14, amp: 24, top: ['#56553a', '#6e4a2e', '#4a5632', '#7a5a2e'], haze: 0.3, seed: 1 },
+    { R: 270, base: 28, amp: 34, top: ['#66706e', '#74706a', '#646e70'], haze: 0.45, seed: 2 },
     { R: 380, base: 46, amp: 52, top: ['#9aabbb', '#a2b2c0'], haze: 0.7, seed: 3 },
   ];
   const haze = COL('#dfe6ea');
@@ -935,7 +940,7 @@ function buildSky(parent) {
       const pts = [[t0, -40, 0], [t1, -40, 0], [t1, hh(t1), 1], [t0, -40, 0], [t1, hh(t1), 1], [t0, hh(t0), 1]];
       for (const [t, y, top] of pts) {
         pos.push(Math.cos(t) * L.R, y, Math.sin(t) * L.R);
-        if (top) { c.set(L.top[Math.floor(vnoise(t * 6, L.seed, 0) * L.top.length) % L.top.length]).lerp(haze, L.haze * 0.6); }
+        if (top) { const q = vnoise(t * 7, L.seed, 0) * (L.top.length - 1), i0 = Math.floor(q); c.set(L.top[i0]).lerp(_c2.set(L.top[Math.min(L.top.length - 1, i0 + 1)]), q - i0).lerp(haze, L.haze * 0.5); }
         else c.copy(haze);
         col.push(c.r, c.g, c.b);
       }
@@ -949,6 +954,7 @@ function buildSky(parent) {
 
 // ---------------------------------------------------------------- 場面
 let S = null; // 場面の作業領域
+if (typeof window !== "undefined") window.__dbg = () => S; // DEBUG-REMOVE
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _s1 = {}, _s2 = {};
 
 const trip = {
@@ -992,7 +998,8 @@ const trip = {
     const tunL = new THREE.PointLight(0xffa040, 0, 10, 1.5); scene.add(tunL);
     // 軽トラ
     const truck = createTruck(); scene.add(truck.group);
-    truck.group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    const castNames = ['paint', 'bedPaint', 'blackPaint', 'chassis', 'liner'];
+    truck.group.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = castNames.includes(o.name) || (!o.name && o.material.roughness > 0.85); } });
     const head = new THREE.SpotLight(0xfff3dc, 0, 30, 0.55, 0.6, 1.2); head.position.set(1.7, 0.8, 0); truck.group.add(head);
     const headT = new THREE.Object3D(); headT.position.set(12, -1.5, 0); truck.group.add(headT); head.target = headT;
     const truckHit = new THREE.Object3D(); truckHit.position.set(0.1, 1.0, 0); truckHit.userData.hitR = 1.5; truck.group.add(truckHit);
@@ -1014,7 +1021,7 @@ const trip = {
     for (let i = 0; i < DOT_N; i++) { dots.setMatrixAt(i, zero); dots.setColorAt(i, COL(0x000000)); }
     scene.add(dots);
     // トンネル出口の光
-    const exitM = new THREE.MeshBasicMaterial({ color: 0xfff6e6, fog: false, transparent: true, opacity: 0, depthWrite: false });
+    const exitM = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 4.8, 4.2), fog: false, transparent: true, opacity: 0, depthWrite: false });
     const sh = new THREE.Shape(); sh.moveTo(-3.6, 0); sh.lineTo(-3.6, 2.2); sh.absarc(0, 2.2, 3.6, Math.PI, 0, true); sh.lineTo(3.6, 0); sh.closePath();
     const exitG = new THREE.ShapeGeometry(sh, 16).rotateY(-Math.PI / 2);
     const exitP = new THREE.Mesh(exitG, exitM); exitP.position.set(TUN1 - 0.2, 0, 0); scene.add(exitP);
@@ -1031,7 +1038,7 @@ const trip = {
     if (S.parcel) { S.parcel.dispose(); S.parcel = null; }
     const parcel = S.parcel = createParcel(st.parcel);
     for (const n of ['F', 'B', 'L', 'R']) parcel.setFlap(n, 0);
-    parcel.group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    parcel.group.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = o.parent === parcel.group || o.userData.kind === 'flap'; } });
     parcel.group.userData.hitR = 0.42; parcel.group.userData.hitOffset = V3(0, 0.11, 0);
     S.boxHolder.add(parcel.group); parcel.group.position.set(0, 0, 0); parcel.group.rotation.set(0, 0, 0);
     S.maple.removeFromParent(); S.maple.visible = false;
@@ -1059,7 +1066,7 @@ const trip = {
     // 家の状態
     G.doorL.position.x = G.doorX0; M.gwin.emissiveIntensity = 0; G.warmLight.intensity = 0; G.warmM.color.set(0x2a2018);
     G.btn.position.z = -0.03; G.lampM.emissiveIntensity = 0.3;
-    S.exitM.opacity = 0;
+    S.exitM.opacity = 0; S._envMats = null; S._envK = -1;
     // 音
     S.eng = S.eng2 = S.wind = S.road = null;
     core.au.ready(() => {
@@ -1118,9 +1125,9 @@ const trip = {
   },
   _arrivalPose() {
     const port = core.aspect < 0.9;
-    const center = port ? V3(299.85, 1.0, 3.2) : V3(300.1, 1.0, 3.6);
-    const dir = port ? V3(-0.22, 1.05, -1).normalize() : V3(-0.45, 0.85, -1).normalize();
-    const r = core.fitCamera(this.camera, { center, w: port ? 4.2 : 7.6, h: port ? 6.0 : 5.0, dir, fov: 42, pad: 1.02, apply: false });
+    const center = port ? V3(299.2, 1.3, 4.9) : V3(299.4, 1.3, 4.9);
+    const dir = port ? V3(0.05, 0.7, -1).normalize() : V3(0.25, 0.62, -1).normalize();
+    const r = core.fitCamera(this.camera, { center, w: port ? 3.7 : 9.5, h: port ? 7.6 : 7.0, dir, fov: 42, pad: 1.0, apply: false });
     return { pos: r.pos, look: center };
   },
   _arrivalCam(snap) {
@@ -1250,7 +1257,7 @@ const trip = {
     core.after(3.2, () => {
       for (let i = 0; i < 10; i++) au.noise({ dur: 0.06, g: 0.09, f: 1100 + (i % 3) * 300, q: 2.2, at: i * 0.07 });
       au.noise({ dur: 0.8, g: 0.08, f: 380, q: 0.7, type: 'lowpass' });
-      core.tween(0.8, k => { G.doorL.position.x = G.doorX0 - k * 0.62; G.warmLight.intensity = k * 7; G.warmM.color.setRGB(lerp(0.16, 1.0, k), lerp(0.12, 0.72, k), lerp(0.09, 0.4, k)); }, { ease: 'out' });
+      core.tween(0.8, k => { G.doorL.position.x = G.doorX0 + k * 0.62; G.warmLight.intensity = k * 7; G.warmM.color.setRGB(lerp(0.16, 1.0, k), lerp(0.12, 0.72, k), lerp(0.09, 0.4, k)); }, { ease: 'out' });
     });
     core.after(4.4, () => { core.state.trip.rang = true; core.save(); core.go('home', { color: '#fff', dur: 0.9 }); });
   },
@@ -1426,7 +1433,12 @@ const trip = {
     const cx = this.camera.position.x;
     const dk = sm(TUN0 - 0.5, TUN0 + 6, cx) * (1 - sm(TUN1 - 6, TUN1 + 1, cx));
     S.dk = dk;
-    core.renderer.toneMappingExposure = 1 - 0.45 * dk;
+    core.renderer.toneMappingExposure = 1 - 0.35 * dk;
+    if (Math.abs(dk - (S._envK ?? -1)) > 0.01) {
+      S._envK = dk;
+      if (!S._envMats) { S._envMats = new Map(); this.scene.traverse(o => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial && !S._envMats.has(o.material)) S._envMats.set(o.material, o.material.envMapIntensity); }); }
+      for (const [m, b] of S._envMats) m.envMapIntensity = b * (1 - 0.88 * dk);
+    }
     S.sun.intensity = 2.7 * (1 - dk * 0.97); S.hemi.intensity = 1.0 * (1 - dk * 0.85);
     const fog = this.scene.fog; fog.color.set(0xdfe6ea).lerp(_c2.set(0x17130f), dk); fog.near = lerp(45, 6, dk); fog.far = lerp(175, 48, dk);
     this.scene.background.copy(fog.color);
@@ -1441,7 +1453,7 @@ const trip = {
       S.tunL.position.set(lx, 5.0, laneZ(tx));
       S.tunL.intensity = dk * 14 * (0.35 + 0.65 * Math.max(0, 1 - Math.abs(bx - lx) / 2.2));
     } else S.tunL.intensity = 0;
-    S.exitM.opacity = clamp((tx - TUN0 - 4) / 26, 0, 1) * 0.95 * (tx < TUN1 + 2 ? 1 : 0);
+    S.exitM.opacity = clamp((tx - TUN0 + 2) / 6, 0, 1) * (1 - sm(TUN1 - 4, TUN1 + 1, cx));
   },
 
   _spawnLeaf(p, v, col) {

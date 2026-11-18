@@ -45,8 +45,8 @@ function knitTextures() {
       for (const s of [-1, 1]) {
         const lx = x + s * cw * 0.22, ang = -s * 0.55;
         const k = 0.88 + r() * 0.18;
-        const cs = [[0, `rgb(${Math.round(226 * k)},${Math.round(58 * k)},${Math.round(64 * k)})`],
-          [0.55, `rgb(${Math.round(178 * k)},${Math.round(26 * k)},${Math.round(38 * k)})`], [1, '#5e0912']];
+        const cs = [[0, `rgb(${Math.round(206 * k)},${Math.round(34 * k)},${Math.round(42 * k)})`],
+          [0.55, `rgb(${Math.round(160 * k)},${Math.round(18 * k)},${Math.round(28 * k)})`], [1, '#5e0912']];
         const bs = [[0, '#fff'], [0.6, '#999'], [1, '#111']];
         for (const dx of [0, -S, S]) for (const dy of [0, -S, S]) {
           if (lx + dx < -cw || lx + dx > S + cw || y + dy < -rh || y + dy > S + rh) continue;
@@ -59,7 +59,7 @@ function knitTextures() {
     c.lineWidth = 0.6;
     for (let i = 0; i < 900; i++) {
       const x = r() * S, y = r() * S, a = r() * 6.28, l = 2 + r() * 5;
-      c.strokeStyle = r() < 0.5 ? 'rgba(240,120,120,0.25)' : 'rgba(90,0,10,0.25)';
+      c.strokeStyle = r() < 0.5 ? 'rgba(225,80,85,0.22)' : 'rgba(90,0,10,0.25)';
       c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke();
     }
     return { map: toTex(col, { repeat: true }), bump: toTex(bmp, { repeat: true, srgb: false }) };
@@ -118,7 +118,7 @@ function createScarf() {
   const g = new THREE.Group();
   const { map, bump } = knitTextures();
   const mat = new THREE.MeshPhysicalMaterial({
-    map, bumpMap: bump, bumpScale: 3, roughness: 0.95, sheen: 0.6, sheenRoughness: 0.7, sheenColor: new THREE.Color(0xd06060),
+    map, bumpMap: bump, bumpScale: 3, roughness: 0.95, sheen: 0.22, sheenRoughness: 0.8, sheenColor: new THREE.Color(0x902028),
   });
   const body = new THREE.Mesh(scarfGeometry(), mat);
   body.castShadow = true; body.receiveShadow = true; g.add(body);
@@ -142,7 +142,7 @@ function createScarf() {
   }
   const fg = mergeGeometries(parts); parts.forEach((p) => p.dispose());
   fg.computeVertexNormals();
-  const fmat = new THREE.MeshPhysicalMaterial({ color: 0x9c1424, roughness: 1, sheen: 0.8, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xd06060) });
+  const fmat = new THREE.MeshPhysicalMaterial({ color: 0x9c1424, roughness: 1, sheen: 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(0x902028) });
   const fr = new THREE.Mesh(fg, fmat); fr.castShadow = true; fr.receiveShadow = true;
   g.add(fr);
   g.userData = { kind: 'scarf', w: 0.2, d: 0.12, h: 0.05 };

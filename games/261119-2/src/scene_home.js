@@ -17,12 +17,12 @@ const TB = { x: 0, z: 0.62, y: 0.33, r: 0.45 };     // ちゃぶ台
 const BOX = V(-0.03, TB.y, 0.80);                  // 小包（底面中心）
 const BOWL = V(0.25, TB.y, 0.40);                  // 菓子鉢
 const CUP = V(-0.27, TB.y, 0.42);                  // 湯のみ
-const CLOCK = V(-0.02, 1.43, WZ);                  // 掛け時計（中心）
+const CLOCK = V(-0.02, 1.37, WZ);                  // 掛け時計（中心）
 const WALL_SPOT = V(0.38, 1.13, WZ + 0.006);       // 絵を貼る場所
-const WALL_RECT = { x0: 0.26, x1: 0.8, y0: 0.98, y1: 1.6 };
-const WIN = { x0: -1.52, x1: -0.84, y1: 1.78 };     // 掃き出し窓（開いている）
+const WALL_RECT = { x0: 0.26, x1: 0.56, y0: 1.0, y1: 1.42 };
+const WIN = { x0: -1.62, x1: -0.84, y1: 1.78 };     // 掃き出し窓（開いている）
 const SHOJI = { x0: -0.72, x1: -0.27, y0: 0.42, y1: 1.7 };
-const TRUCK_POS = V(-1.55, -0.32, -5.3);
+const TRUCK_POS = V(-1.5, -0.32, -5.2);
 const PACK_UP = 0.09;                               // 箱の中の詰め紙の厚み（中身を少し持ち上げて見せる）
 const FLAP_OPEN = 1.22;
 const { W: PW, D: PD, H: PH } = PARCEL;
@@ -30,14 +30,15 @@ const FLAP_ORDER = ['F', 'B', 'L', 'R'];
 const SPOT_MAIN = 'cheekL';
 const DIR = V(0, 0.7, 1).normalize();               // 注視点→カメラ
 const ELEV = Math.atan2(0.7, 1);
+const EVE = { shoji: new THREE.Color(0xffb067), sun: new THREE.Color(0xffb27e), sky: new THREE.Color(0xffb88a) };
 
 // 段階ごとの構図（縦長は幅 w、横長は高さ h が効く）
 const FR = {
-  A: { c: V(0, 0.8, 0.36), w: 0.84, h: 1.8 },
-  C: { c: V(0, 0.82, 0.3), w: 0.94, h: 1.85 },
-  W: { c: V(0.1, 0.9, 0.12), w: 1.0, h: 1.85 },
-  S: { c: V(0, 0.66, 0.42), w: 0.64, h: 1.3 },
-  T: { c: V(-0.5, 0.92, -0.25), w: 1.62, h: 1.9 },
+  A: { c: V(0, 0.8, 0.36), w: 0.84, h: 1.4 },
+  C: { c: V(0, 0.84, 0.3), w: 0.94, h: 1.55 },
+  W: { c: V(0.1, 0.9, 0.12), w: 1.0, h: 1.6, d: V(0, 0.85, 1).normalize() },
+  S: { c: V(0, 0.66, 0.42), w: 0.64, h: 1.05 },
+  T: { c: V(-0.52, 0.86, -0.3), w: 1.56, h: 1.75, d: V(0, 0.3, 1).normalize(), cp: V(-0.74, 0.9, -0.3), wp: 1.8 },
 };
 
 // テープの玉の置き場所（ちゃぶ台の上）
@@ -197,7 +198,7 @@ export default {
       wood: std({ map: core.tex.wood({ base: '#6a4628', dark: '#38220f', light: '#8d6640', seed: 5 }), roughness: 0.55, env: 0.5 }),
       lacq: std({ map: core.tex.wood({ base: '#5a3418', dark: '#2c1608', light: '#7a4a26', seed: 9 }), roughness: 0.32, env: 0.6 }),
       shoji: std({ map: shojiTex(), roughness: 0.9, emissive: 0xfff0d6, emissiveIntensity: 0.62, env: 0.3 }),
-      ceil: std({ color: 0x6b5338, roughness: 0.8, env: 0.3 }),
+      ceil: std({ color: 0xa88560, emissive: 0x3a2a1a, roughness: 0.8, env: 0.5 }),
     };
     M.shoji.emissiveMap = M.shoji.map;
     const woodGeos = [];
@@ -300,7 +301,7 @@ export default {
         const hd = new THREE.SphereGeometry(0.022 + r() * 0.008, 10, 7); hd.scale(1, 0.6, 1); hd.translate(tip.x, tip.y, tip.z); heads.push(hd);
         const lf = new THREE.SphereGeometry(0.02, 6, 4); lf.scale(1.4, 0.2, 0.6); lf.rotateY(a); lf.translate(tip.x * 0.55, 0.3 + r() * 0.06, tip.z * 0.55); leaves.push(lf.toNonIndexed());
       }
-      const fl = new THREE.Group(); fl.position.copy(vase.position); g.add(fl);
+      const fl = R.flowers = new THREE.Group(); fl.position.copy(vase.position); g.add(fl);
       fl.add(mesh(mergeGeometries([...stems, ...leaves]), std({ color: 0x4f6b2c, roughness: 0.7 })));
       fl.add(mesh(mergeGeometries(heads), std({ color: 0xe7a12a, roughness: 0.75 })));
     }
@@ -383,7 +384,7 @@ export default {
     // ほっぺの光の置き場
     R.cheekHolder = new THREE.Object3D(); scene.add(R.cheekHolder);
     R.holdHolder = new THREE.Object3D(); scene.add(R.holdHolder);
-    R.fr = { c: FR.A.c.clone(), w: FR.A.w, h: FR.A.h };
+    R.fr = { c: FR.A.c.clone(), w: FR.A.w, h: FR.A.h, d: DIR.clone() };
   },
 
   // ================================================================ enter
@@ -407,7 +408,7 @@ export default {
     const parcel = R.parcel = createParcel(P);
     parcel.group.position.copy(BOX); scene.add(parcel.group);
     if (P.closed) { if (P.tapes.length === 0) this._bind(); }
-    else { this._bind(); for (const n of FLAP_ORDER) { parcel.setFlap(n, FLAP_OPEN); R.flapOpen[n] = true; } }
+    else { this._bind(); for (const n of FLAP_ORDER) { parcel.setFlap(n, FLAP_OPEN); R.flapOpen[n] = true; } if (H.celebrated) parcel.setFlap('F', 1.0); }
     if (!R.paper) R.paper = mesh(paperGeo(), std({ map: core.tex.mottled({ base: '#ece5d4', spots: 300, alpha: 0.05, seed: 4 }), roughness: 0.9, side: THREE.DoubleSide }), false, true);
     R.paper.position.set(0, PACK_UP - 0.004, 0); parcel.group.add(R.paper);
     parcel.group.userData.hitR = 0.2; parcel.group.userData.hitOffset = V(0, 0.12, 0);
@@ -477,7 +478,7 @@ export default {
     if (P.items.length > 0) return 'C';
     if (H.given.drawing && !H.wall) return 'W';
     if (!H.celebrated) return 'D0';
-    const hasSt = R.parcel && R.parcel.stickerMeshes.length > 0;
+    const hasSt = R.parcel && R.parcel.stickerMeshes.some(m => m.parent === R.parcel.flaps.F.pivot);
     const faced = Object.keys(H.face).length > 0;
     if (hasSt && !faced) return 'D1';
     return 'T';
@@ -524,12 +525,14 @@ export default {
       this._celebrate();
     } else if (st === 'D1') {
       const ms = this._pickMainSticker(); R.mainSticker = ms;
+      this._flapTo('F', 1.0);
       R.fxh.push(fx.pulse(ms, { color: 0xfff0b0, amp: 0.4 }));
       R.fxh.push(fx.halo(R.cheekHolder, { r: 0.05, opacity: 0.55, color: 0xffd0d8 })); R.cheekHalo = true;
       core.hint.set({ kind: 'drag', arc: 0.06, from: () => ms.getWorldPosition(_v), to: () => gm.faceSpotWorld(SPOT_MAIN, _v2), cue: c => { if (c === 1) { fx.wobble(ms, { amp: 0.15, dur: 0.6, axis: 'y' }); snd.fufu(); gm.bounce(); core.tween(1.0, (k, raw) => { R.tilt = -Math.sin(raw * Math.PI) * 0.15; }, { ease: 'linear' }); } } });
       R.gaze = () => cam.position; say.arms('table');
       this._frame(FR.S);
     } else if (st === 'T') {
+      this._flapTo('F', 1.0);
       if (!R.truckIn) this._truckShow(true);
       else this._truckCue();
       this._frame(FR.T);
@@ -561,21 +564,28 @@ export default {
   // ================================================================ 構図
   _frame(f, dur = 1.2) {
     if (R.frTw) { R.frTw.kill(); R.frTw = null; }
-    if (!dur) { R.frTarget = f; R.fr.c.copy(f.c); R.fr.w = f.w; R.fr.h = f.h; this._applyFrame(); return; }
+    if (!dur) { R.frTarget = f; R.fr.c.copy(f.c); R.fr.w = f.w; R.fr.h = f.h; R.fr.d.copy(f.d || DIR); this._applyFrame(); return; }
     if (R.frTarget === f) return;
     R.frTarget = f;
-    const c0 = R.fr.c.clone(), w0 = R.fr.w, h0 = R.fr.h;
-    R.frTw = core.tween(dur, k => { R.fr.c.lerpVectors(c0, f.c, k); R.fr.w = lerp(w0, f.w, k); R.fr.h = lerp(h0, f.h, k); this._applyFrame(); }, { ease: 'inout' });
+    const c0 = R.fr.c.clone(), w0 = R.fr.w, h0 = R.fr.h, d0 = R.fr.d.clone(), d1 = (f.d || DIR).clone().normalize();
+    R.frTw = core.tween(dur, k => { R.frK = k; R.fr.c.lerpVectors(c0, f.c, k); R.fr.w = lerp(w0, f.w, k); R.fr.h = lerp(h0, f.h, k); R.fr.d.lerpVectors(d0, d1, k).normalize(); this._applyFrame(); }, { ease: 'inout' });
   },
-  _applyFrame() { if (cam) core.fitCamera(cam, { center: R.fr.c, w: R.fr.w, h: R.fr.h, dir: DIR, fov: 40, pad: 1.06 }); },
+  _applyFrame() {
+    if (!cam) return;
+    // 縦長で別の中心が指定されている構図（軽トラ）は寄せ先を変える
+    const f = R.frTarget, port = core.aspect < 0.8;
+    let c = R.fr.c, w = R.fr.w;
+    if (port && f && f.cp) { const k = R.frTw ? R.frK || 0 : 1; c = _v.copy(R.fr.c).lerp(f.cp, k); w = lerp(R.fr.w, f.wp, k); }
+    core.fitCamera(cam, { center: c, w, h: R.fr.h, dir: R.fr.d, fov: 40, pad: 1.06 });
+  },
 
   // ================================================================ 夕方の光
   _evening(k) {
     R.eve = k;
-    R.M.shoji.emissive.setHex(0xfff0d6).lerp(new THREE.Color(0xffb067), k);
-    R.sun.color.setHex(0xffe2c0).lerp(new THREE.Color(0xffb27e), k);
+    R.M.shoji.emissive.setHex(0xfff0d6).lerp(EVE.shoji, k);
+    R.sun.color.setHex(0xffe2c0).lerp(EVE.sun, k);
     R.sun.intensity = lerp(2.3, 2.0, k);
-    R.skyMat.color.setHex(0xffffff).lerp(new THREE.Color(0xffb88a), k * 0.8);
+    R.skyMat.color.setHex(0xffffff).lerp(EVE.sky, k * 0.8);
   },
 
   // ================================================================ 小包の補助
@@ -870,8 +880,10 @@ export default {
     const hs = core.toScreen(gm.holdPoint.getWorldPosition(_v), _s);
     const hd = core.toScreen(gm.headWorld(_v2), _s2);
     const rad = Math.max(80, Math.min(core.W, core.H) * 0.24);
-    const dHold = Math.hypot(p.x - hs.x, p.y - hs.y), dHead = Math.hypot(p.x - hd.x, p.y - hd.y);
-    if (!p.cancel && (dHold < rad || dHead < rad * 0.8)) { this._give(it); return; }
+    const bs = core.toScreen(_v3.copy(BOX).add(V(0, PH, 0)), {});
+    const dHold = Math.hypot(p.x - hs.x, p.y - hs.y), dHead = Math.hypot(p.x - hd.x, p.y - hd.y), dBox = Math.hypot(p.x - bs.x, p.y - bs.y);
+    // おばあちゃんの手（か顔）に近く、箱よりおばあちゃん寄りで離したら受け取る
+    if (!p.cancel && (dHold < rad || dHead < rad * 0.8) && Math.min(dHold, dHead) < dBox * 0.85) { this._give(it); return; }
     // ちゃぶ台の上？
     const t = p.cancel ? null : core.onPlane(p, TB.y);
     if (t && Math.hypot(t.x - TB.x, t.z - TB.z) < TB.r - 0.08 && !(Math.abs(t.x - BOX.x) < PW / 2 + 0.09 && Math.abs(t.z - BOX.z) < PD / 2 + 0.08) && t.z > TB.z - 0.3) {
@@ -891,7 +903,7 @@ export default {
     core.tween(0.42, (k, raw) => { o.position.lerpVectors(a, pp.pos, k); o.position.y += Math.sin(raw * Math.PI) * 0.06; o.quaternion.slerpQuaternions(qa, qb, k); }, { ease: 'inout', done: () => { it.where = 'box'; it.busy = false; au.thud(0.35); } });
   },
   _holdPose(kind, o, instant, done) {
-    const pos = kind === 'drawing' ? V(0, 0.07, 0.01) : kind === 'mikan' ? V(0, -0.03, 0) : V(0, -0.022, 0.0);
+    const pos = kind === 'drawing' ? V(0, 0.095, 0.0) : kind === 'mikan' ? V(0, -0.03, 0) : V(0, -0.022, 0.0);
     const qb = this._carryQuat(kind, 'hold', new THREE.Quaternion());
     if (kind === 'scarf') qb.setFromEuler(new THREE.Euler(0, 0, 0));
     if (instant) { o.position.copy(pos); o.quaternion.copy(qb); return; }
@@ -1021,6 +1033,10 @@ export default {
       R.lock = false; this._refresh();
     });
   },
+  _flapTo(n, t) {
+    const f = R.parcel.flaps[n], a = f.t; if (Math.abs(a - t) < 0.01) return;
+    core.tween(0.6, k => R.parcel.setFlap(n, lerp(a, t, k)), { ease: 'inout' });
+  },
   _pickMainSticker() {
     const ms = R.parcel.stickerMeshes;
     const f = ms.find(m => m.parent === R.parcel.flaps.F.pivot);
@@ -1037,21 +1053,19 @@ export default {
     const f = R.fly = new THREE.Mesh(R.flyGeo, mat); f.renderOrder = 6;
     m.getWorldPosition(f.position); f.quaternion.copy(cam.quaternion); scene.add(f);
     m.visible = false;
-    const fp = gm.faceSpotWorld(SPOT_MAIN, V());
+    const fp = gm.faceSpotWorld(SPOT_MAIN, V()).addScaledVector(DIR, 0.09);
     R.drag = { type: 'sticker', mesh: m, k, obj: f, target: f.position.clone().add(V(0, 0.03, 0.02)), plane: fp, off: V(0, 0, 0) };
-    snd.peri(); say.expr('calm'); say.arms('table'); R.gaze = () => f.position;
+    snd.peri(); say.expr('calm'); say.arms('table'); R.gaze = () => f.position.y > BOX.y + 0.3 ? cam.position : f.position;
     return true;
   },
   _stickerUp(p, d) {
     const f = d.obj, H = Hs();
-    let best = null, bd = Math.max(56, Math.min(core.W, core.H) * 0.13);
-    if (!p.cancel) for (const sp of ['cheekL', 'cheekR', 'forehead']) {
-      const s = core.toScreen(gm.faceSpotWorld(sp, _v), _s); const dd = Math.hypot(p.x - s.x, p.y - s.y);
-      if (dd < bd) { bd = dd; best = sp; }
-    }
-    if (!best) {
-      const hd = core.toScreen(gm.headWorld(_v), _s);
-      if (!p.cancel && Math.hypot(p.x - hd.x, p.y - hd.y) < Math.max(70, Math.min(core.W, core.H) * 0.16)) best = p.y < hd.y - 8 ? 'forehead' : (p.x > hd.x ? 'cheekL' : 'cheekR');
+    // 顔のあたりで離したら: 目より上ならおでこ、下なら左右のほっぺ
+    let best = null;
+    if (!p.cancel) {
+      const hd = core.toScreen(gm.headWorld(_v), _s), fh = core.toScreen(gm.faceSpotWorld('forehead', _v2), _s2);
+      const hr = Math.max(Math.abs(fh.y - hd.y) * 2.6, 40), lim = Math.max(hr * 1.5, Math.min(core.W, core.H) * 0.15);
+      if (Math.hypot(p.x - hd.x, p.y - hd.y) < lim) best = p.y < (hd.y + fh.y) / 2 ? 'forehead' : (p.x > hd.x ? 'cheekL' : 'cheekR');
     }
     if (!best) {
       const a = f.position.clone(), b = d.mesh.getWorldPosition(V());
@@ -1110,7 +1124,7 @@ export default {
     const a = lm.getWorldPosition(V());
     R.parcel.setLeaf(false); core.save();
     au.rustle();
-    const spot = { x: BOX.x - 0.26, z: BOX.z - 0.17, r: 0.8 };
+    const spot = { x: BOX.x - 0.3, z: BOX.z + 0.0, r: 0.8 };
     Hs().leaf = spot; core.save();
     const l = this._tableLeaf(spot, true);
     const b = l.position.clone();
@@ -1159,6 +1173,8 @@ export default {
     // 振り子
     R.pendAmp = lerp(R.pendAmp, 0.1, dt * 0.25);
     R.pend.rotation.z = Math.sin(t * Math.PI * 2 / 1.25) * R.pendAmp;
+    // 性能が足りないときは飾りを減らす
+    if (core.low && !R.lowApplied) { R.lowApplied = true; R.steam[2].s.visible = false; R.steam.length = 2; if (R.flowers) R.flowers.visible = false; }
     // 湯気
     R.steamBoost = Math.max(0, R.steamBoost - dt * 0.5);
     for (const s of R.steam) {

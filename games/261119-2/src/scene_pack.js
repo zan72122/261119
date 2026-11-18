@@ -438,7 +438,7 @@ const scene = {
   },
   computeCams() {
     this.fitShift(this.camA, new V3(0, 0.8, 0.0), 0.9, 0.86, new V3(0, 0.74, 1), 1.04, 0.85);
-    this.fitShift(this.camE, new V3(0.22, 0.5, -1.45), 2.0, 2.8, new V3(0, 0.95, 1), 1.04, -0.15);
+    this.fitShift(this.camE, new V3(0.1, 0.62, -1.4), 1.3, 1.8, new V3(0, 0.45, 1), 1.04, 0);
   },
   applyCam() {
     const k = core.ease.inout(clamp(this.camK, 0, 1)), cam = this.camera;
@@ -501,7 +501,7 @@ const scene = {
         cue: s => { if (s === 1) { this.hop(lab, 0.025); core.au.pop(1.3); } } });
     } else if (st === 'E') {
       if (this.truckSt !== 'parked') { core.hint.clear(); return; }
-      this.own.push(fx.halo(this.truck.bed, { r: 0.42, y: 0.2, opacity: 0.32 }));
+      this.own.push(fx.halo(this.truck.bed, { r: 0.36, y: 0.2, opacity: 0.2 }));
       this.own.push(fx.halo(this.parcel.group, { r: 0.3, y: PH * 0.6, opacity: 0.22 }));
       this.dotsOn = true;
       const vf = new V3(), vt = new V3();
@@ -558,7 +558,14 @@ const scene = {
   },
   onMove(p) {
     const d = this.drag; if (!d) return;
-    if (d.type === 'item') { if (core.onPlane(p, TABLE_Y + 0.12, _a)) d.pt.set(_a.x + d.off.x, TABLE_Y + 0.12, _a.z + d.off.z); }
+    if (d.type === 'item') {
+      // 箱の近くでは箱の口より上に持ち上げる
+      if (core.onPlane(p, d.pt.y, _a)) {
+        const x = _a.x + d.off.x, z = _a.z + d.off.z, ud = d.it.userData;
+        const near = Math.abs(x - BOX_X) < HW + ud.w / 2 + 0.06 && Math.abs(z - BOX_Z) < HD + ud.d / 2 + 0.06;
+        d.pt.set(x, near ? TABLE_Y + PH + 0.07 : TABLE_Y + 0.12, z);
+      }
+    }
     else if (d.type === 'flap') this.moveFlap(p);
     else if (d.type === 'tape') this.moveTape(p);
     else if (d.type === 'decor') { if (core.onPlane(p, this.topY() + 0.035, _a)) d.pt.copy(_a); }
@@ -983,6 +990,8 @@ const scene = {
   // ------------------------------------------------------------ 毎フレーム
   update(dt, t) {
     if (this.camK > 0) this.applyCam();
+    // 影が切られた（低負荷モード）ときは日差しを弱めて白飛びを防ぐ
+    const li = this.sun.castShadow ? 2.5 : 1.5; if (this.sun.intensity !== li) this.sun.intensity = li;
     const d = this.drag, kf = 1 - Math.exp(-dt * 22);
     if (d && d.type === 'item') {
       const it = d.it, px = it.position.x, pz = it.position.z;
