@@ -255,8 +255,8 @@ export function makeSponge() {
 }
 
 // ---------------------------------------------------------------- 3. strawberry
-const SB_PROFILE = [[0, 0], [0.0060, 0], [0.0095, 0.0002], [0.0122, 0.0012], [0.0140, 0.0035], [0.0150, 0.0075], [0.0151, 0.0118],
-  [0.0144, 0.0163], [0.0129, 0.0208], [0.0107, 0.0250], [0.0081, 0.0287], [0.0053, 0.0315], [0.0027, 0.0332], [0.0009, 0.0340], [0, 0.0342]];
+const SB_PROFILE = [[0, 0], [0.0060, 0], [0.0098, 0.0003], [0.0128, 0.0016], [0.0145, 0.0042], [0.0151, 0.0075], [0.0148, 0.0108],
+  [0.0136, 0.0148], [0.0118, 0.0193], [0.0096, 0.0238], [0.0072, 0.0280], [0.0047, 0.0314], [0.0024, 0.0335], [0.0008, 0.0344], [0, 0.0346]];
 const SB_NP = 56, SB_SEG = 40;
 function strawberryBase() {
   return once('sbBase', () => {
@@ -303,12 +303,12 @@ function strawberryTextures() {
     const cb = makeCanvas(S, S), xb = cb.getContext('2d');
     xb.fillStyle = 'rgb(150,150,150)'; xb.fillRect(0, 0, S, S);
     const R = rng(5);
-    const sh = S * 0.0016 / L;
+    const sh = S * 0.0014 / L;
     let row = 0;
-    for (let s = vCut * L + 0.0024; s < L - 0.0022; s += 0.0027, row++) {
+    for (let s = vCut * L + 0.0026; s < L - 0.0024; s += 0.0032, row++) {
       const v = s / L, r = Math.max(rAt(v), 0.0022);
-      const n = Math.max(3, Math.round(2 * Math.PI * r / 0.0031));
-      const sw = Math.min(S * 0.0011 / (2 * Math.PI * r), 40);
+      const n = Math.max(3, Math.round(2 * Math.PI * r / 0.0037));
+      const sw = Math.min(S * 0.00095 / (2 * Math.PI * r), 40);
       const py = (1 - v) * S;
       for (let k = 0; k < n; k++) {
         const u = (k + (row % 2) * 0.5 + (R() - 0.5) * 0.25) / n;
@@ -317,12 +317,12 @@ function strawberryTextures() {
           const px = u * S + ox;
           if (px < -60 || px > S + 60) continue;
           // dimple
-          x.fillStyle = 'rgba(110,0,10,0.35)';
+          x.fillStyle = 'rgba(90,0,8,0.45)';
           x.beginPath(); x.ellipse(px, pyj, sw * 1.15, sh * 0.85, 0, 0, Math.PI * 2); x.fill();
           // achene
-          x.fillStyle = R() < 0.15 ? '#c9b24a' : '#e8c64c';
+          x.fillStyle = R() < 0.2 ? '#b89a3e' : '#d8b44a';
           x.beginPath(); x.ellipse(px, pyj - sh * 0.08, sw * 0.5, sh * 0.42, 0, 0, Math.PI * 2); x.fill();
-          x.fillStyle = 'rgba(255,250,200,0.6)';
+          x.fillStyle = 'rgba(255,245,200,0.45)';
           x.beginPath(); x.ellipse(px - sw * 0.15, pyj - sh * 0.22, sw * 0.18, sh * 0.13, 0, 0, Math.PI * 2); x.fill();
           // bump
           const gr = xb.createRadialGradient(px, pyj, 0, px, pyj, Math.max(sw, sh) * 1.3);
@@ -348,7 +348,7 @@ function strawberryGeo(variant) {
     const p = g.attributes.position;
     for (let i = 0; i < p.count; i++) {
       let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-      const t = y / 0.0342, th = Math.atan2(x, z);
+      const t = y / 0.0346, th = Math.atan2(x, z);
       const f = 1 + a1 * Math.sin(th + p1) * (0.4 + t) + a2 * Math.sin(2 * th + p2) * t + a3 * Math.sin(3 * th + p3) * (0.3 + t);
       x *= f * flat; z *= f / flat;
       x += tilt * t * t; z += tiltZ * t * t;
@@ -374,7 +374,7 @@ export function makeStrawberry(seed = 0) {
   g.name = 'strawberry';
   g.add(mesh);
   g.userData.radius = 0.015 * s;
-  g.userData.height = 0.0342 * sy;
+  g.userData.height = 0.0346 * sy;
   return shadows(g);
 }
 
@@ -875,7 +875,7 @@ export function makeRoom() {
     for (const m of shadeMats) { m.emissiveIntensity = 1.6 * level; }
     bulbMat.color.setRGB(1.0, 0.85, 0.63).multiplyScalar(0.05 + 3.0 * level);
     for (const g of glowMats) { g.m.opacity = g.maxOp * level; g.m.visible = level > 0.01; }
-    glassMat.color.setScalar(lerp(0.3, 0.95, level));
+    glassMat.color.setScalar(lerp(0.22, 0.95, level));
     haloMat.opacity = lerp(0.85, 0.55, level);
     for (const m of flagMats) m.emissiveIntensity = lerp(0.02, 0.12, level);
   };
@@ -952,7 +952,7 @@ function papaGeos() {
     const thigh = limbGeo(0.08, 0.062, 0.40, 16);
     const shin = limbGeo(0.058, 0.045, 0.42, 14);
     const thumb = new THREE.CapsuleGeometry(0.0085, 0.026, 4, 8);
-    const collar = new THREE.TorusGeometry(0.068, 0.0085, 8, 32);
+    const collar = new THREE.LatheGeometry(splinePts([[0.0565, 0.016], [0.0595, 0.0175], [0.0625, 0.014], [0.066, 0.004], [0.072, -0.006], [0.074, -0.012]], 3), 32);
     const smile = new THREE.TorusGeometry(0.021, 0.0026, 6, 20, Math.PI * 0.62);
     const arc = new THREE.TorusGeometry(0.0085, 0.0021, 6, 14, Math.PI * 0.78);
     const ring = new THREE.TorusGeometry(0.0078, 0.0036, 8, 20);
@@ -1042,7 +1042,7 @@ export function makePapa() {
   const [spine, spineOff] = pivot(papa, 0, -0.40, -0.03);
   mesh(G.torso, sweater, spineOff, 0, 0, -0.02);
   const [chest, chestOff] = pivot(spineOff, 0, -0.02, -0.03);
-  mesh(G.collar, rib, chestOff, 0, 0.296, -0.014).rotation.x = Math.PI / 2 - 0.12;
+  { const c = mesh(G.collar, rib, chestOff, 0, 0.298, -0.014); c.scale.set(1.04, 1, 0.97); c.rotation.x = -0.06; }
   const [neck, neckOff] = pivot(chestOff, 0, 0.31, -0.012);
   mesh(G.neck, skin, neckOff, 0, 0.385, -0.012).scale.set(1, 1, 0.92);
   const head = new THREE.Group(); head.name = 'papaHead';
