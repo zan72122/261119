@@ -131,7 +131,7 @@ export function createEngine(container) {
   buildEnv();
 
   // ---------------------------------------------------------------- lights
-  const key = new THREE.DirectionalLight(0xfff1df, 2.6);
+  const key = new THREE.DirectionalLight(0xfff1df, 2.0);
   key.position.set(-1.3, 2.4, 1.5);
   key.target.position.set(0, 0, 0);
   key.castShadow = true;
@@ -170,9 +170,9 @@ export function createEngine(container) {
   const roomListeners = [];
   const roomTween = { active: false, from: 1, to: 1, t: 0, dur: 0 };
   function applyRoomLight(L) {
-    key.intensity = 2.6 * L;
+    key.intensity = 2.0 * L;
     key.visible = L > 0.002;
-    hemi.intensity = lerp(0.10, 0.7, L);
+    hemi.intensity = lerp(0.10, 0.35, L);
     hemi.color.copy(HEMI_SKY_OFF).lerp(HEMI_SKY_ON, L);
     hemi.groundColor.copy(HEMI_GND_OFF).lerp(HEMI_GND_ON, L);
     scene.environmentIntensity = lerp(0.03, 0.9, L);
