@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1612">
+<meta name="format-detection" content="telephone=no">
+<title>ういーん！パパのおたんじょうびケーキ</title>
+<style>
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  overflow: hidden; background: #1c1612;
+  overscroll-behavior: none; touch-action: none;
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: rgba(0,0,0,0); -webkit-text-size-adjust: 100%;
+}
+body { position: fixed; inset: 0; }
+#app {
+  position: fixed; left: 0; top: 0; width: 100%; height: 100%;
+  overflow: hidden; touch-action: none;
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+}
+#app canvas { display: block; touch-action: none; outline: none; }
+/* blurred picture of the first scene: painted before the game script runs, faded out on the first frame */
+#splash {
+  position: fixed; inset: -24px; pointer-events: none;
+  background: #c9955d url("__POSTER_SRC__") center / cover no-repeat;
+  filter: blur(14px); transform: translateZ(0);
+  transition: opacity 0.45s ease-out;
+}
+#splash.off { opacity: 0; }
+#fallback {
+  display: none; position: fixed; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; pointer-events: none;
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="splash"></div>
+<img id="fallback" alt="" draggable="false" src="__FALLBACK_SRC__">
+<!-- the game itself: kept as text so the page (splash) can paint before it is parsed and run -->
+<script type="text/plain" id="game-src">
+__BUNDLE__
+</script>
+<script>
+(function () {
+  var started = false;
+  function run() {
+    if (started) return; started = true;
+    var src = document.getElementById('game-src');
+    var s = document.createElement('script');
+    s.text = src.textContent;
+    src.parentNode.removeChild(src);
+    document.body.appendChild(s);
+  }
+  // let the browser show the splash first (rAF fires before that paint, the timeout after it)
+  if (window.requestAnimationFrame && !document.hidden) requestAnimationFrame(function () { setTimeout(run, 0); });
+  setTimeout(run, document.hidden ? 0 : 1500); // rAF is paused in background tabs
+})();
+</script>
+</body>
+</html>
