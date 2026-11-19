@@ -1207,6 +1207,7 @@
       D.setCurtainWind(0);
       hair.setWind(null);
       girl.update(0.016, clock); girl.group.updateMatrixWorld(true);
+      hair.setAutoDry(0);
       hair.setPreset('wet'); hair.restore({ c: 'none', n: 0 }); hair.setTowel(1);
       audio.ambience('room', 0.5); audio.ambience('outside', 0); audio.ambience('breeze', 0);
       state.stage = 0;
