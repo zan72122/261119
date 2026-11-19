@@ -12,10 +12,20 @@
       if (canvas) canvas.style.display = 'none';
       if (fb) {
         var img = fb.getAttribute('data-img') || '';
-        if (img.indexOf('data:') === 0) fb.style.backgroundImage = 'url("' + img + '")';
+        if (img) fb.style.backgroundImage = 'url("' + img + '")';
         fb.style.display = 'block';
       }
+      reveal();
     } catch (e) { /* nothing more we can do */ }
+  }
+  // the page shows a soft still of the opening view until the first real frame; then it fades away
+  function reveal() {
+    try {
+      var p = document.getElementById('poster');
+      if (!p) return;
+      p.style.opacity = '0';
+      setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 900);
+    } catch (e) { /* */ }
   }
   function hasWebGL() {
     try {
@@ -62,20 +72,32 @@
     var sets = GF.createSets({ renderer: renderer, low: low });
     var props = GF.createProps({ low: low });
     var girl = GF.createGirl({ low: low });
-    var mom = GF.createMom ? GF.createMom({ low: low }) : { group: new T.Group(), handL: new T.Object3D(), reach: function () {}, setWalk: function () {}, update: function () {} };
+    var mom = null;   // Mum and the genkan set are built later (ensureLate), in the background while the player is busy
     var hair = GF.createHair({ anchor: girl.headAnchor, low: low });
     var audio = null;
     try { audio = GF.createAudio ? GF.createAudio() : null; } catch (e) { audio = null; }
     if (!audio) audio = noopAudio();
-    scene.add(sets.root, props.group, girl.group, hair.group, mom.group);
+    scene.add(sets.root, props.group, girl.group, hair.group);
     girl.headAnchor.add(props.towel.head);
     girl.torsoAnchor.add(props.pochette.worn);
     scene.updateMatrixWorld(true);
     scene.attach(props.finger.group);
     props.finger.setOpacity(0);
-    mom.group.position.fromArray(P.momGenkan);
-    mom.group.visible = false;
-    var D = sets.dresser, G = sets.genkan;
+    var D = sets.dresser, G = null;
+    function ensureMom() {
+      if (mom) return;
+      try { mom = GF.createMom ? GF.createMom({ low: low }) : null; } catch (e) { mom = null; }
+      if (!mom) mom = { group: new T.Group(), handL: new T.Object3D(), reach: function () {}, setWalk: function () {}, update: function () {} };
+      mom.group.position.fromArray(P.momGenkan);
+      mom.group.visible = state.scene === 'genkan';
+      scene.add(mom.group);
+    }
+    function ensureGenkan() {
+      if (G) return;
+      G = sets.ensureGenkan();
+      if (state.lowPower && G.lights && G.lights.sun) G.lights.sun.castShadow = false;
+    }
+    function ensureLate() { ensureGenkan(); ensureMom(); }
     var dryer = props.dryer, brushP = props.brush, tissue = props.tissue, mbox = props.musicBox, pochette = props.pochette, towelP = props.towel, finger = props.finger;
 
     // guidance "sunbeam"
@@ -1100,6 +1122,7 @@
       try { hair.restore(hair.serialize()); } catch (e) { /* */ }
     }
     function toGenkan() {
+      ensureLate();
       dryerRelease(); brushRelease();
       sets.activate('genkan'); state.scene = 'genkan';
       props.group.visible = false;
@@ -1203,8 +1226,8 @@
       bag.worn = false; bag.held = false; bag.glide.active = false;
       pochette.setWorn(false); pochette.group.position.copy(pochette.home.position); pochette.group.quaternion.copy(pochette.home.quaternion);
       door.v = 0; door.p = 0; door.target = 0; door.drag = false;
-      G.door.setOpen(0); G.door.setHandle(0); G.setDaylight(0);
-      mom.group.visible = false; mom.group.position.fromArray(P.momGenkan); mom.setWalk(0); mom.reach(0);
+      if (G) { G.door.setOpen(0); G.door.setHandle(0); G.setDaylight(0); }
+      if (mom) { mom.group.visible = false; mom.group.position.fromArray(P.momGenkan); mom.setWalk(0); mom.reach(0); }
       girl.setPose('sit'); girl.group.position.set(0, 0, 0); girl.setWalk(0); girl.holdHand(0);
       girl.setFace({ sleepy: 1, smile: 0, blink: 0, squint: 0, mouthO: 0, gazeX: 0, gazeY: 0 });
       baseSmile = 0; smileBoostT = 0; brushFace = false; lookT = 0;
@@ -1360,7 +1383,7 @@
       if (state.lowPower) return;
       state.lowPower = true;
       try { D.mirror.setSize(256); } catch (e) { /* */ }
-      try { if (D.lights && D.lights.key) D.lights.key.castShadow = false; if (G.lights && G.lights.sun) G.lights.sun.castShadow = false; } catch (e) { /* */ }
+      try { if (D.lights && D.lights.key) D.lights.key.castShadow = false; if (G && G.lights && G.lights.sun) G.lights.sun.castShadow = false; } catch (e) { /* */ }
       try { hair.setDetail(0.6); } catch (e) { /* */ }
       pCap = 60;
     }
@@ -1384,7 +1407,7 @@
     }
 
     // ---------------------------------------------------------------- frame
-    var paused = false, hiddenFlag = false, raf = 0, lastNow = -1, mirrorFrame = 0;
+    var paused = false, hiddenFlag = false, raf = 0, lastNow = -1, mirrorFrame = 0, revealed = false;
     function step(dt) {
       var t = clock;
       // active drag follows the finger (camera matrices from the last frame are fine)
@@ -1404,7 +1427,7 @@
       updateEnding(dt, t);
       if (smileBoostT > 0) { smileBoostT -= dt; if (smileBoostT <= 0 && !brushFace) setBaseSmile(baseSmile); }
       if (!endT.on) { if (lookT > 0) { lookT -= dt; girl.lookAt(lookP); } else girl.lookAt(null); }
-      if (state.scene === 'genkan') mom.update(dt, t);
+      if (state.scene === 'genkan' && mom) mom.update(dt, t);
       updateHold();
       girl.update(dt, t);
       hair.update(dt, t);
@@ -1416,40 +1439,80 @@
       audio.update(dt);
       if (saveAt > 0 && clock > saveAt) save();
     }
-    // shader / shadow-program warm-up, one chunk per frame right after start-up (the intro is calm), so that later
-    // moments (opening the mirror, props appearing, the genkan scene) do not stutter on first-time compilation
-    var warm = 0, stash = [];
+    // ---------------------------------------------------------------- shader compilation / background preparation
+    // The first frame only needs the dresser room with the mirror shut. Everything else (the mirror's shader variants,
+    // the wing mirrors' room capture, the genkan set + Mum, their shaders and shadow programs, the other set's
+    // variants) is prepared afterwards, one small task at a time between frames, while no finger is down — so the
+    // game appears quickly and later moments (opening the mirror, the genkan scene) still do not stutter.
+    var parallelGL = false;
+    try { parallelGL = !!renderer.extensions.get('KHR_parallel_shader_compile'); } catch (e) { parallelGL = false; }
+    var stash = [];
     // compile only the materials of what can appear with the given set (renderer.compile walks the whole scene,
-    // hidden objects included, which would also build useless variants of the other set under these lights)
+    // hidden objects included, which would also build useless variants of the other set under these lights).
+    // Returns a promise that resolves when the programs are ready (driver-parallel compilation when available)
     function compileFor(name, mirrorToo) {
-      var excl = name === 'dresser' ? [sets.genkan.group, mom.group] : [sets.dresser.group, props.group];
-      for (var i = 0; i < excl.length; i++) excl[i].traverse(function (o) { if (o.material) { stash.push(o, o.material); o.material = null; } });
+      var excl = name === 'dresser' ? [G && G.group, mom && mom.group] : [sets.dresser.group, props.group];
+      for (var i = 0; i < excl.length; i++) if (excl[i]) excl[i].traverse(function (o) { if (o.material) { stash.push(o, o.material); o.material = null; } });
+      var waits = [];
       try {
-        if (mirrorToo) D.mirror.prewarm(renderer, scene, camera); else renderer.compile(scene, camera);
+        if (mirrorToo) D.mirror.prewarm(renderer, scene, camera, parallelGL ? waits : null);
+        else if (parallelGL) waits.push(renderer.compileAsync(scene, camera));
+        else renderer.compile(scene, camera);
       } finally {
         for (var j = 0; j < stash.length; j += 2) stash[j].material = stash[j + 1];
         stash.length = 0;
       }
+      return Promise.all(waits);
     }
-    function prewarm() {
-      warm++;
+    // the other set: show it for a moment (inside render(), before the real pass overdraws it) to compile its
+    // programs and draw it once so its shadow programs and textures are on the GPU too
+    function prepareSet(name, drawToo) {
+      var pv = props.group.visible, mv = mom ? mom.group.visible : false, cur = state.scene, wait = null;
+      sets.activate(name);
+      props.group.visible = name === 'dresser'; if (mom) mom.group.visible = name === 'genkan';
       try {
-        if (warm === 2) compileFor(state.scene, state.scene === 'dresser');
-        else if (warm === 3) {
-          var other = state.scene === 'dresser' ? 'genkan' : 'dresser';
-          var pv = props.group.visible, mv = mom.group.visible;
-          sets.activate(other);
-          props.group.visible = other === 'dresser'; mom.group.visible = other === 'genkan';
-          try {
-            scene.updateMatrixWorld();
-            compileFor(other, other === 'dresser');
-            renderer.render(scene, camera);   // shadow pass of that set (depth programs); overdrawn by this frame's real render
-          } finally { sets.activate(state.scene); props.group.visible = pv; mom.group.visible = mv; scene.updateMatrixWorld(); }
-        }
-      } catch (e) { /* warm-up is optional */ }
+        scene.updateMatrixWorld();
+        if (drawToo) { compileFor(name, false); renderer.render(scene, camera); }
+        else wait = compileFor(name, name === 'dresser');
+      } finally { sets.activate(cur); props.group.visible = pv; if (mom) mom.group.visible = mv; scene.updateMatrixWorld(); }
+      return wait;
     }
-    function render() {
-      if (warm < 3) prewarm();
+    var bg = { list: [], next: 0.8, wait: false, holdT: 0, skip: 0 };   // first task a moment after the first frame
+    function bgPlan() {
+      bg.list.length = 0;
+      if (state.scene === 'dresser') {
+        bg.list.push(function () { return compileFor('dresser', true); });               // mirror pass + reflection variants
+        bg.list.push(function () { if (state.scene === 'dresser') D.mirror.capture(renderer, scene); }); // wing mirrors
+      } else {
+        bg.list.push(function () { return prepareSet('dresser', false); });
+      }
+      bg.list.push(function () { sets.ensureGenkan('textures'); });
+      bg.list.push(function () { ensureGenkan(); });
+      bg.list.push(function () { ensureMom(); });
+      if (state.scene === 'dresser') {
+        bg.list.push(function () { return prepareSet('genkan', false); });
+        bg.list.push(function () { if (state.scene === 'dresser') prepareSet('genkan', true); });
+      }
+    }
+    function bgPump(dt) {
+      if (!bg.list.length || bg.wait) return;
+      // not while a finger is dragging something (unless it goes on for long), not during a scene change
+      if ((ptr.id !== null && (bg.holdT += dt) < 4) || state.trans) { bg.next = Math.max(bg.next, clock + 0.3); return; }
+      if (clock < bg.next) return;
+      bg.holdT = 0;
+      var fn = bg.list.shift(), r = null;
+      try { r = fn(); } catch (e) { r = null; }
+      bg.skip = 2;
+      bg.next = clock + 0.15;
+      if (r && r.then) {
+        bg.wait = true;
+        var done = function () { bg.wait = false; bg.next = clock + 0.1; };
+        r.then(done, done);
+        setTimeout(done, 8000);   // never stall the queue on a driver that does not report completion
+      }
+    }
+    function render(dt) {
+      bgPump(dt);
       // world matrices once per frame (the mirror pass and the main pass would each walk the whole scene again)
       scene.updateMatrixWorld();
       scene.matrixWorldAutoUpdate = false;
@@ -1472,8 +1535,9 @@
       lastNow = now;
       var dt = clamp(rawDt, 0, 0.05);
       clock += dt;
-      try { step(dt); render(); } catch (e) { /* keep the game alive */ }
-      perfStep(rawDt);
+      try { step(dt); render(dt); } catch (e) { /* keep the game alive */ }
+      if (!revealed) { revealed = true; reveal(); }
+      if (bg.skip > 0) bg.skip--; else perfStep(rawDt);   // a background task's frame is not a sign of load
     }
     function startLoop() { if (!raf && !paused && !hiddenFlag) { lastNow = -1; raf = requestAnimationFrame(frame); } }
     function stopLoop() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
@@ -1501,12 +1565,35 @@
     resetWorld();
     restore();
     if (state.stage >= 1 && state.scene === 'dresser') shotSnap('work');
-    GF.game = { state: state, camera: camera, scene: scene, sets: sets, props: props, girl: girl, mom: mom, hair: hair, audio: audio };
+    GF.game = { state: state, camera: camera, scene: scene, sets: sets, props: props, girl: girl, hair: hair, audio: audio };
+    Object.defineProperty(GF.game, 'mom', { get: function () { return mom; }, enumerable: true });
     if (document.hidden) hiddenFlag = true;
     updateCamera(0, 0);
-    startLoop();
+    // first picture: compile only what the opening view shows (in parallel where the driver can), then start;
+    // the poster in the page stays up until the first real frame is drawn
+    bgPlan();
+    var booted = false;
+    function go() { if (booted) return; booted = true; startLoop(); }
+    var first = null;
+    try {
+      scene.updateMatrixWorld();
+      var mirrorOpen = state.scene === 'dresser' && (wings.L.v > 0.015 || wings.R.v > 0.015);
+      first = compileFor(state.scene, mirrorOpen);
+    } catch (e) { first = null; }
+    if (first && parallelGL) { first.then(go, go); setTimeout(go, 6000); } else go();
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
+  // let the browser paint the poster first, then build (the build blocks the page for a moment)
+  var started = false;
+  function kick() {
+    if (started) return;
+    started = true;
+    setTimeout(start, 0);
+  }
+  function boot() {
+    try { requestAnimationFrame(kick); } catch (e) { /* */ }
+    setTimeout(kick, 120);   // hidden tabs get no animation frames
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();

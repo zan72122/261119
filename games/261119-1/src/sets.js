@@ -378,6 +378,9 @@
       ctx.strokeStyle = 'rgba(160,150,135,0.6)'; ctx.lineWidth = 1; ctx.strokeRect(mx - 0.5, my - 0.5, iw + 1, ih + 1);
     });
 
+    // genkan-only textures (tiles, grass, sky): made on demand, while the player is busy at the dresser
+    X.loadGenkan = function () {
+    if (X.tile) return;
     // 10) entrance tiles (300 mm warm-grey stone porcelain), 512 px = 0.6 m (2 x 2 tiles)
     X.tile = rep(GF.canvasTex(512, 512, function (ctx, w, h) {
       var img = ctx.createImageData(w, h), d = img.data, ts = w / 2, F1 = field(w, h, 16, 16, 10), F2 = field(w, h, 4, 4, 11);
@@ -443,6 +446,7 @@
       }
     });
     X.sky.anisotropy = aniso;
+    };
     return X;
   }
 
@@ -478,17 +482,31 @@
 
     var root = new T.Group(); root.name = 'GF.sets';
     var D = buildDresser(TX, M, low, SEG);
-    var G = buildGenkan(TX, M, low, SEG);
-    root.add(D.group, G.group);
+    root.add(D.group);
+    // the genkan (front door + garden) is only needed at the end of the story: it is built on demand
+    // (ensureGenkan / genkan getter), normally in the background while the player is at the dresser
+    var G = null;
+    function ensureGenkan(part) {
+      if (G) return G.api;
+      TX.loadGenkan();
+      if (part === 'textures') return null;
+      G = buildGenkan(TX, M, low, SEG);
+      G.group.visible = current === 'genkan';
+      root.add(G.group);
+      return G.api;
+    }
     var current = '';
     function activate(name) {
       if (name !== 'dresser' && name !== 'genkan') return;
       current = name;
+      if (name === 'genkan') ensureGenkan();
       D.group.visible = name === 'dresser';
-      G.group.visible = name === 'genkan';
+      if (G) G.group.visible = name === 'genkan';
     }
     activate('dresser');
-    var api = { root: root, activate: activate, dresser: D.api, genkan: G.api };
+    var api = { root: root, activate: activate, dresser: D.api, ensureGenkan: ensureGenkan };
+    Object.defineProperty(api, 'genkan', { get: function () { return ensureGenkan(); }, enumerable: true });
+    Object.defineProperty(api, 'genkanReady', { get: function () { return !!G; } });
     Object.defineProperty(api, 'active', { get: function () { return current; } });
     return api;
   };
@@ -925,9 +943,10 @@
     self.api = {
       update: function (renderer, scene, camera) {
         if (!renderer || !scene || !camera || !grp.visible) return;
-        if (self.onFirst) { var f = self.onFirst; self.onFirst = null; try { f(renderer, scene); } catch (e) { /* keep the plain env */ } }
+        var shut = self.wingsClosed && self.wingsClosed();
+        if (!shut) self.api.capture(renderer, scene);              // wing reflections (normally captured earlier in the background)
         if (!enabled) return;
-        if (self.wingsClosed && self.wingsClosed()) return;      // glass fully covered
+        if (shut) return;                                          // glass fully covered
         glass.updateWorldMatrix(true, false);
         camera.updateMatrixWorld();
         mPos.setFromMatrixPosition(glass.matrixWorld);
@@ -997,11 +1016,22 @@
       },
       // compile the shader variants the mirror needs (screen pass with the reflection material, linear HDR target pass)
       // ahead of time, so that opening the wings does not stall on shader compilation
-      prewarm: function (renderer, scene, camera) {
+      // waits (optional array): compile without blocking where the driver compiles in parallel, pushing promises
+      prewarm: function (renderer, scene, camera, waits) {
         var cur = renderer.getRenderTarget(), m = glass.material;
         glass.material = reflMat;
-        try { renderer.compile(scene, camera); renderer.setRenderTarget(rt); renderer.compile(scene, camera); }
+        try {
+          if (waits) { waits.push(renderer.compileAsync(scene, camera)); renderer.setRenderTarget(rt); waits.push(renderer.compileAsync(scene, camera)); }
+          else { renderer.compile(scene, camera); renderer.setRenderTarget(rt); renderer.compile(scene, camera); }
+        }
         finally { glass.material = m; renderer.setRenderTarget(cur); }
+      },
+      // one-off cube capture for the wing mirrors; deferred while the wings are shut (they hide it), so the first
+      // frame does not pay for it. The game calls it in the background; update() does it at the latest on opening
+      capture: function (renderer, scene) {
+        if (!self.onFirst || !renderer || !scene) return;
+        var f = self.onFirst; self.onFirst = null;
+        try { f(renderer, scene); } catch (e) { /* keep the plain env */ }
       },
       setEnabled: function (on) {
         enabled = !!on;

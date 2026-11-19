@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Build games/261119-1/index.html (single self-contained file) from src/ + vendor/.
+"""Build games/261119-1 from src/: index.html (small page with an inline poster) + app.js (all of src/*.js).
+vendor/three.min.js and src/fallback.jpg are loaded from where they are.
 Usage: python3 build.py     (run from anywhere; no dependencies)"""
-import base64, os, sys
+import base64, hashlib, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ORDER = ['base.js', 'audio.js', 'sets.js', 'props.js', 'girl.js', 'hair.js', 'game.js']
@@ -12,9 +13,16 @@ def read(*p):
         return f.read()
 
 
+def data_uri(*p):
+    path = os.path.join(HERE, *p)
+    if not os.path.exists(path):
+        return ''
+    with open(path, 'rb') as f:
+        return 'data:image/jpeg;base64,' + base64.b64encode(f.read()).decode('ascii')
+
+
 def main():
     html = read('src', 'index.template.html')
-    three = read('vendor', 'three.min.js')
     parts = []
     for name in ORDER:
         path = os.path.join(HERE, 'src', name)
@@ -22,21 +30,18 @@ def main():
             print('skip (missing):', name)
             continue
         parts.append('/* ---- %s ---- */\n%s' % (name, read('src', name)))
-    app = '\n'.join(parts)
-    fb = os.path.join(HERE, 'src', 'fallback.jpg')
-    data = ''
-    if os.path.exists(fb):
-        with open(fb, 'rb') as f:
-            data = 'data:image/jpeg;base64,' + base64.b64encode(f.read()).decode('ascii')
-    # </script> inside JS would end the inline block early
-    for label, js in (('three', three), ('app', app)):
-        if '</script' in js.lower():
-            sys.exit('error: "</script" found in %s bundle' % label)
-    html = html.replace('/*__THREE__*/', three).replace('/*__APP__*/', app).replace('__FALLBACK_IMG__', data)
+    app = '\n'.join(parts) + '\n'
+    ver = hashlib.sha1(app.encode('utf-8')).hexdigest()[:10]
+    with open(os.path.join(HERE, 'app.js'), 'w', encoding='utf-8') as f:
+        f.write(app)
+    # poster: tiny stills of the opening view (portrait / landscape), blurred by CSS until the first real frame
+    html = (html.replace('__POSTER_P__', data_uri('src', 'poster-p.jpg'))
+                .replace('__POSTER_L__', data_uri('src', 'poster-l.jpg'))
+                .replace('__VER__', ver))
     out = os.path.join(HERE, 'index.html')
     with open(out, 'w', encoding='utf-8') as f:
         f.write(html)
-    print('wrote %s (%.2f MB)' % (out, os.path.getsize(out) / 1e6))
+    print('wrote index.html (%.1f KB) + app.js (%.0f KB)' % (os.path.getsize(out) / 1e3, len(app.encode('utf-8')) / 1e3))
 
 
 if __name__ == '__main__':
