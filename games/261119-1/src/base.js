@@ -191,7 +191,7 @@
       for (var i = 0; i < list.length; i++) {
         var e = list[i];
         e.mat.emissive.copy(e.base).lerp(glowCol, Math.min(1, v * 1.2));
-        e.mat.emissiveIntensity = e.baseI + (0.55 - e.baseI) * v;
+        e.mat.emissiveIntensity = e.baseI + (0.8 - e.baseI) * v;
       }
     };
   };

@@ -966,7 +966,7 @@
       if (f !== hint.focus) {
         if (hint.focus && hint.focus.glow) hint.focus.glow(0);
         if (hint.focus) hint.focus.pv = 0;
-        hint.focus = f; idleT = 0; hint.demoT = -1; hint.nextWob = clock + 3.5;
+        hint.focus = f; idleT = 0; hint.demoT = -1; hint.nextWob = clock + 1.6;
         finger.setOpacity(0);
         if (f) { f.pos(tA); glance(tA, 2.2); }
       }
@@ -990,17 +990,17 @@
         spot.angle = gk ? 0.11 : 0.12;
       }
       spot.position.copy(hint.spotP);
-      spot.intensity = (state.scene === 'genkan' ? 9 : 4.5) * hint.spotOn;
+      spot.intensity = (state.scene === 'genkan' ? 14 : 9) * hint.spotOn;
       spot.target.updateMatrixWorld();
       if (quiet) { if (hint.demoT >= 0) { hint.demoT = -1; finger.setOpacity(0); } if (f) f.pv = 0; return; }
       // wobble + chime
-      if (idleT > 3.5 && clock >= hint.nextWob) {
+      if (idleT > 1.5 && clock >= hint.nextWob) {          // a first quiet nudge, then nudges with a chime
         hint.nextWob = clock + 2.5;
-        wobble(f, 1); sndAt('hint', hint.fpos, 0.55);
+        if (idleT > 3.5) { wobble(f, 1); sndAt('hint', hint.fpos, 0.55); } else wobble(f, 0.7);
         glance(hint.fpos, 2);
       }
       // demo finger
-      if (idleT > 8) {
+      if (idleT > 6.5) {
         if (hint.demoT < 0) hint.demoT = 0;
         hint.demoT += dt;
         demoFinger(f, hint.demoT % 3.4);
