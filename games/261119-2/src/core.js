@@ -53,10 +53,14 @@ function sanitize(s) {
 }
 
 export const core = {
-  THREE, clamp, lerp, ease, rng,
+  clamp, lerp, ease, rng,
   renderer: null, canvas: null, env: null,
   W: 1, H: 1, aspect: 1, low: false, time: 0,
   state: defaultState(), scenes: {}, cur: null, busy: false,
+  // あとから読み込む場面: 場面 id → 読み込むスクリプト（最初の場面だけ index.html に入れ、残りは遊んでいる間に読む）
+  lazy: {}, _chunks: {},
+  // 裏仕事の列（core.bg）: 操作していない・動きの演出がない合間に、少しずつ進める
+  _bgq: [], _bgRun: false, _calm: 0, _bgWait: 1.2, _bgGap: 0,
   safe: { t: 0, b: 0, l: 0, r: 0 },
   _tweens: [], _timers: [], _raf: 0, _last: 0, _scale: 1, _ema: 16, _emaT: 0, _saveT: 0,
   // 動的解像度の状態: _warm=計測を休む残り秒, _probe=直前に下げたときの記録, _noDown/_noUp=調整を止める残り秒
@@ -66,7 +70,7 @@ export const core = {
   load() {
     try { const raw = localStorage.getItem(SAVE_KEY); this.state = raw ? sanitize(JSON.parse(raw)) : defaultState(); }
     catch (e) { this.state = defaultState(); }
-    if (this.state.done || !this.scenes[this.state.scene]) this.state = defaultState();
+    if (this.state.done || !this.known(this.state.scene)) this.state = defaultState();
   },
   save() { this._saveT = 0.3; },
   _flush() { this._saveT = 0; try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.state)); } catch (e) { /* 保存できなくても遊べる */ } },
@@ -99,9 +103,87 @@ export const core = {
 
   // ---------- 場面 ----------
   register(sc) { this.scenes[sc.id] = sc; },
+  known(id) { return !!(this.scenes[id] || this.lazy[id]); },
+  // 場面のスクリプトを読み込む（同じスクリプトは1回だけ）。失敗したら少し待って読み直す
+  need(id) {
+    if (this.scenes[id]) return Promise.resolve(this.scenes[id]);
+    const src = this.lazy[id];
+    if (!src) return Promise.reject(new Error('unknown scene ' + id));
+    let p = this._chunks[src];
+    if (!p) {
+      p = this._chunks[src] = new Promise((res, rej) => {
+        const el = document.createElement('script'); el.src = src; el.async = true;
+        el.onload = res;
+        el.onerror = () => { delete this._chunks[src]; el.remove(); rej(new Error('load failed ' + src)); };
+        document.head.appendChild(el);
+      });
+    }
+    return p.then(() => { if (!this.scenes[id]) throw new Error('missing scene ' + id); return this.scenes[id]; });
+  },
+  _needRetry(id) {
+    return new Promise(res => { const t = () => this.need(id).then(res, () => setTimeout(t, 1500)); t(); });
+  },
+  // 場面の準備（init）を裏で済ませ、続けてシェーダーとテクスチャも少しずつ作る
+  bgScene(id) {
+    this.bg(() => this.need(id).then(sc => {
+      this.bg(() => {
+        if (!sc._inited) { sc.init(this); sc._inited = true; }
+        if (sc === this.cur) return;
+        return this.prewarm(sc);
+      });
+    }, () => { /* 読めなければ場面に入るときに読み直す */ }));
+  },
+  // 裏仕事を足す。fn は配列（続きの小さな仕事）か Promise を返してよい
+  bg(fn) { this._bgq.push(fn); },
+  _bgPump() {
+    if (this._bgRun || !this._bgq.length || this.busy || this._pid !== null || this._tweens.length || this._calm < 0.6 || this._bgWait > 0 || this._bgGap > 0) return;
+    this._bgRun = true;
+    setTimeout(() => {
+      const t0 = performance.now();
+      let wait = null;
+      // 小さな仕事は 1 回に約 8ms ぶんまとめて進める（大きな仕事は 1 つだけ）
+      while (this._bgq.length && !wait && performance.now() - t0 < 8 && this._pid === null && !this.busy && this._bgGap <= 0) {
+        const fn = this._bgq.shift();
+        let r; try { r = fn(); } catch (e) { console.error(e); }
+        if (Array.isArray(r)) this._bgq.unshift(...r);
+        else if (r && typeof r.then === 'function') wait = r;
+      }
+      const done = () => { this._bgRun = false; };
+      if (wait) wait.then(done, done); else done();
+    }, 0);
+  },
+  // シェーダー作りを少しずつ進める仕事の列を返す（遊んでいる最中でも引っかからない大きさに分ける）。
+  // 裏で作れる環境（KHR_parallel_shader_compile）のときだけ先に作る。作れない環境や、テクスチャの転送は
+  // 先にやると今の場面の描画が止まるので、これまでどおり場面に入るとき（画面が隠れている間）に行う。
+  // extra: まだ場面に入っていないが、あとで足す物
+  prewarm(sc, extra = []) {
+    const r = this.renderer; if (!r || !sc || !sc.scene || !sc.camera || !r.extensions.has('KHR_parallel_shader_compile')) return [];
+    const objs = [], visit = o => { if (o.material) objs.push(o); };
+    sc.scene.traverse(visit);
+    for (const o of [...extra, ...(sc.warmObjs || [])]) if (o && !o.parent) o.traverse(visit);
+    const jobs = [];
+    const sets = sc.lightSets || [], all = sets.flat();
+    for (let i = -1; i < sets.length; i++) {
+      for (let j = 0; j < objs.length; j += 6) {
+        const part = objs.slice(j, j + 6);
+        // 一部の物だけを持つ仮の場面で compile する（ライト・霧・環境光は本物の場面のものを使う）
+        const sub = { traverse: f => part.forEach(f), traverseVisible: () => {} };
+        jobs.push(() => {
+          const vis = all.map(l => l.visible);
+          if (all.length) for (const l of all) l.visible = i >= 0 && sets[i].includes(l);
+          try { r.compile(sub, sc.camera, sc.scene); } catch (e) { /* 描画時に作られる */ }
+          all.forEach((l, k) => { l.visible = vis[k]; });
+          this._bgGap = 0.15;
+        });
+      }
+    }
+    return jobs;
+  },
   go(id, o = {}) {
-    if (this.busy || !this.scenes[id]) return;
+    if (this.busy || !this.known(id)) return;
     this.busy = true;
+    // まだ読み込んでいない場面なら、画面を隠している間に読み込みを待つ
+    const wait = this.scenes[id] ? null : this._needRetry(id);
     const fade = this._fade, dur = o.dur ?? 0.6;
     const swap = () => {
       this._endPointer(true);
@@ -116,14 +198,15 @@ export const core = {
       if (this.low) this._applyLow();
       this.warm(sc);
       this._warm = 1.5; this._probe = null;
-      this.busy = false;
+      this.busy = false; this._calm = 0;
       fade.style.opacity = '0';
     };
-    if (o.instant) { fade.style.transition = 'none'; swap(); return; }
+    const run = () => { if (wait) wait.then(swap); else swap(); };
+    if (o.instant) { fade.style.transition = 'none'; run(); return; }
     fade.style.background = o.color || '#000';
     fade.style.transition = `opacity ${dur}s ease`;
     fade.style.opacity = '1';
-    let done = false; const once = () => { if (!done) { done = true; swap(); } };
+    let done = false; const once = () => { if (!done) { done = true; run(); } };
     setTimeout(once, dur * 1000 + 60);
   },
   _clearAll() {
@@ -190,7 +273,7 @@ export const core = {
     this.fx._init(); this.hint._init();
     this.load();
     const h = (location.hash || '').slice(1);
-    if (this.scenes[h]) this.state.scene = h; // 開発用の場面ジャンプ
+    if (this.known(h)) this.state.scene = h; // 開発用の場面ジャンプ
     this._bind();
     this._measure();
     this.go(this.state.scene, { instant: true });
@@ -199,7 +282,8 @@ export const core = {
     this._raf = requestAnimationFrame(this._tick);
   },
   _fallback() {
-    const f = document.getElementById('fb'); if (f) f.style.display = 'block';
+    // 代わりの絵は WebGL が使えないときだけ読み込む（ふだんの起動では読まない）
+    const f = document.getElementById('fb'); if (f) { if (f.dataset.src && !f.src) f.src = f.dataset.src; f.style.display = 'block'; }
     const c = document.getElementById('c'); if (c) c.style.display = 'none';
     const fd = document.getElementById('fade'); if (fd) fd.style.display = 'none';
   },
@@ -239,7 +323,7 @@ export const core = {
       self._pid = e.pointerId;
       try { c.setPointerCapture(e.pointerId); } catch (er) { /* noop */ }
       const p = self._p = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: self.time, dx: 0, dy: 0, moved: 0, cancel: false };
-      mk(e); self.hint.poke();
+      mk(e); self.hint.poke(); self._calm = 0;
       try { self.cur.onDown && self.cur.onDown(p); } catch (er) { console.error(er); }
     });
     c.addEventListener('pointermove', e => {
@@ -247,7 +331,7 @@ export const core = {
       e.preventDefault();
       const p = self._p, ox = p.x, oy = p.y; mk(e);
       p.dx = p.x - ox; p.dy = p.y - oy; p.moved += Math.hypot(p.dx, p.dy);
-      self.hint.poke();
+      self.hint.poke(); self._calm = 0;
       try { self.cur.onMove && self.cur.onMove(p); } catch (er) { console.error(er); }
     });
     const up = cancel => e => { if (e.pointerId !== self._pid) return; if (!cancel) mk(e); self._endPointer(cancel); };
@@ -271,6 +355,7 @@ export const core = {
   _endPointer(cancel) {
     if (this._pid === null) return;
     const p = this._p; this._pid = null; this._p = null;
+    this._calm = 0;
     if (p && this.cur) { p.cancel = !!cancel; this.hint.poke(); try { this.cur.onUp && this.cur.onUp(p); } catch (er) { console.error(er); } }
   },
   get pointerDown() { return this._pid !== null; },
@@ -322,6 +407,12 @@ export const core = {
       this.fx._update(dt, this.time); this.hint._update(dt, this.time);
       this.renderer.render(sc.scene, sc.camera);
     }
+    if (!this.busy && sc) {
+      this._calm += dt; this._bgGap -= dt;
+      // 最初の場面が出て少したったら、残りの場面のスクリプトを読み始める（読み込み自体は裏で進む）
+      if (this._bgWait > 0 && (this._bgWait -= dt) <= 0) for (const id in this.lazy) this.need(id).catch(() => {});
+    }
+    this._bgPump();
   },
 };
 core._tick = now => core._frame(now);

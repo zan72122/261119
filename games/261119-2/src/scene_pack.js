@@ -301,10 +301,15 @@ const scene = {
     this.items = {};
     for (const k of ITEM_KINDS) { const it = createItem(k); it.userData.hitR = HIT_R[k]; it.userData.hitOffset = new V3(0, 0.02, 0); this.items[k] = it; }
     this.roll = buildRoll(T); this.roll.group.userData.hitOffset = new V3(0, 0, 0);
-    this.sheet = buildSheet(T);
-    this.truck = createTruck();
-    this.truck.group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    this.truckHit = new THREE.Object3D(); this.truckHit.position.set(0.9, 1.0, 0); this.truckHit.userData.hitR = 0.85; this.truck.group.add(this.truckHit);
+    // シール台紙（宛名・シール8枚の絵）も D の段階まで出ないので、裏で1枚ずつ絵を作ってから組み立てる
+    this.sheet = null;
+    for (const k of STICKER_KINDS) core.bg(() => { stickerTexture(k); });
+    core.bg(() => { labelTexture(); });
+    core.bg(() => { this.ensureSheet(); });
+    // 軽トラは最後の段階（おくりだす）まで出ないので、最初の表示では作らない。
+    // 遊んでいる間に裏で作り（core.bg）、間に合わなければ使う直前に作る（ensureTruck）
+    this.truck = null;
+    core.bg(() => { this.ensureTruck(); return core.prewarm(this, [this.truck.group, this.sheet && this.sheet.group]); });
 
     // 合わせ目を流れる光の筋（C）
     const glowTex = core.tex.radial('rgba(255,236,170,1)', 'rgba(255,236,170,0)', 64);
@@ -325,6 +330,35 @@ const scene = {
     }
     this.camA = { pos: new V3(), tgt: new V3() }; this.camE = { pos: new V3(), tgt: new V3() };
     this.camK = 0; this.own = [];
+  },
+
+  ensureSheet() {
+    if (!this.sheet) { this.sheet = buildSheet(core.tex); this.resetSheet(); }
+    return this.sheet;
+  },
+  resetSheet() {
+    const sh = this.sheet; if (!sh) return;
+    const P = core.state.parcel;
+    sh.group.removeFromParent();
+    sh.group.position.set(0, TABLE_Y, ROW_Z); sh.group.rotation.set(0, 0, 0);
+    for (const m of [sh.label, ...Object.values(sh.stickers)]) { sh.group.add(m); m.position.copy(m.userData.slot); m.rotation.set(0, 0, 0); m.scale.setScalar(m.userData.slotScale); m.userData._bs = null; }
+    sh.label.visible = !P.label;
+    for (const k of STICKER_KINDS) sh.stickers[k].visible = !P.stickers.some(s => s.k === k);
+  },
+  ensureTruck() {
+    if (this.truck) return this.truck;
+    const tr = this.truck = createTruck();
+    tr.group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    this.truckHit = new THREE.Object3D(); this.truckHit.position.set(0.9, 1.0, 0); this.truckHit.userData.hitR = 0.85; tr.group.add(this.truckHit);
+    this.resetTruck();
+    return tr;
+  },
+  resetTruck() {
+    const tr = this.truck; if (!tr) return;
+    tr.group.removeFromParent();
+    tr.group.position.set(-12, GROUND_Y, TRUCK_Z); tr.body.position.set(0, 0, 0); tr.body.rotation.set(0, 0, 0);
+    for (const n of ['near', 'far', 'rear']) tr.setGate(n, 0);
+    tr.setBlink(0); tr.setBrake(0); tr.setHeadlights(0); tr.setSteer(0);
   },
 
   // ------------------------------------------------------------ 組み立て直し
@@ -382,18 +416,13 @@ const scene = {
       roll.group.position.set(h.x, TABLE_Y + roll.r, h.z); this.scene.add(roll.group);
     }
     // シール台紙
-    const sh = this.sheet; sh.group.removeFromParent();
-    sh.group.position.set(0, TABLE_Y, ROW_Z); sh.group.rotation.set(0, 0, 0);
-    for (const m of [sh.label, ...Object.values(sh.stickers)]) { sh.group.add(m); m.position.copy(m.userData.slot); m.rotation.set(0, 0, 0); m.scale.setScalar(m.userData.slotScale); m.userData._bs = null; }
-    sh.label.visible = !P.label;
-    for (const k of STICKER_KINDS) sh.stickers[k].visible = !P.stickers.some(s => s.k === k);
-    if (st === 'D' || st === 'E') this.scene.add(sh.group);
+    if (st === 'D' || st === 'E') this.ensureSheet();
+    this.resetSheet();
+    if (st === 'D' || st === 'E') this.scene.add(this.sheet.group);
     this.tagPlaced();
     // 軽トラ
-    const tr = this.truck; tr.group.removeFromParent();
-    tr.group.position.set(-12, GROUND_Y, TRUCK_Z); tr.body.position.set(0, 0, 0); tr.body.rotation.set(0, 0, 0);
-    for (const n of ['near', 'far', 'rear']) tr.setGate(n, 0);
-    tr.setBlink(0); tr.setBrake(0); tr.setHeadlights(0); tr.setSteer(0);
+    if (st === 'E') this.ensureTruck();
+    this.resetTruck();
     for (const d of this.dots) d.visible = false;
     this.room.userData.deco[1].visible = !core.low;
 
@@ -840,7 +869,7 @@ const scene = {
     const P = core.state.parcel;
     this.clearOwn(); this.streak.visible = false;
     this.rollHome(ROLL_PARK); S.rollRumble(0.6, 0.08);
-    const g = this.sheet.group; g.position.set(-1.1, TABLE_Y + 0.25, ROW_Z); g.rotation.set(0, 0, 0.3); this.scene.add(g);
+    const g = this.ensureSheet().group; g.position.set(-1.1, TABLE_Y + 0.25, ROW_Z); g.rotation.set(0, 0, 0.3); this.scene.add(g);
     for (const k of STICKER_KINDS) this.sheet.stickers[k].visible = !P.stickers.some(s => s.k === k);
     this.sheet.label.visible = !P.label;
     core.au.whoosh(0.6);
@@ -927,7 +956,7 @@ const scene = {
     if (this.truckSt !== 'none') return;
     this.stage = 'E'; this.truckSt = 'arriving'; this.lock = false;
     core.hint.clear(); this.clearOwn(); this.topGlow.visible = false;
-    const tr = this.truck, g = tr.group, x0 = -12;
+    const tr = this.ensureTruck(), g = tr.group, x0 = -12;
     g.position.set(x0, GROUND_Y, TRUCK_Z); this.scene.add(g);
     tr.setHeadlights(0.6);
     core.au.ready(() => { if (this.truckSt === 'none') return; this.engine = core.au.loop({ kind: 'osc', osc: 'sawtooth', type: 'lowpass', f: 240, q: 1.2, pitch: 46 }); this.engine.set({ g: 0.02 }, 0.01); this.engine.set({ g: 0.09, pitch: 58, f: 320 }, 0.6); });
