@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#efe4dc">
+<title>コード巻取り掃除機</title>
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #efe4dc;
+    overscroll-behavior: none; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+  }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+  #hint { position: fixed; inset: 0; pointer-events: none; visibility: hidden; opacity: 0; }
+  #hint .hint-ball, #hint .hint-ring { position: absolute; left: 0; top: 0; border-radius: 50%; will-change: transform; }
+  /* 指の玉：クリーム色のラグの上でも見えるよう、白い玉に濃いめの橙のふちと影をつける */
+  #hint .hint-ball {
+    width: 76px; height: 76px; box-sizing: border-box;
+    background: radial-gradient(circle at 40% 35%, rgba(255,255,255,0.97), rgba(255,246,214,0.85) 58%, rgba(255,214,120,0.75));
+    border: 4px solid rgba(255, 150, 40, 0.95);
+    box-shadow: 0 6px 16px rgba(90, 50, 20, 0.45), 0 0 0 3px rgba(255,255,255,0.85);
+  }
+  #hint .hint-ring { width: 76px; height: 76px; border: 6px solid rgba(255, 160, 50, 0.95); box-sizing: border-box; opacity: 0; }
+  #debug {
+    display: none; position: fixed; left: 6px; top: 6px; z-index: 10; pointer-events: auto;
+    background: rgba(20, 20, 30, 0.72); color: #e8f7e8; border-radius: 6px; padding: 4px 6px;
+    font: 11px/1.35 ui-monospace, Menlo, Consolas, monospace; max-width: calc(100vw - 24px);
+  }
+  #debug pre { margin: 0; white-space: pre-wrap; }
+  #debug button { margin-top: 4px; font: inherit; padding: 2px 10px; }
+  body.no-webgl { background: #f6d6e0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="hint" aria-hidden="true"></div>
+<div id="debug"></div>
+<!-- すべて古典スクリプト（file:// でも動く）。実行時のネットワークは使わない。 -->
+<script src="vendor/three.iife.min.js"></script>
+<script src="assets/manifest.js"></script>
+<script src="shell/layout.js"></script>
+<script src="shell/tier.js"></script>
+<script src="shell/textures.js"></script>
+<script src="shell/audio.js"></script>
+<script src="shell/input.js"></script>
+<script src="shell/camera.js"></script>
+<script src="shell/scene.js"></script>
+<script src="shell/hint.js"></script>
+<script src="shell/debug.js"></script>
+<script src="hero/hero.bundle.js"></script>
+<script src="shell/main.js"></script>
+</body>
+</html>

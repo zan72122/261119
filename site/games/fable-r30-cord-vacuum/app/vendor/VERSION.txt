@@ -1,0 +1,1 @@
+three 0.187.0 (npm), bundled as IIFE -> window.THREE, window.THREE_ADDONS

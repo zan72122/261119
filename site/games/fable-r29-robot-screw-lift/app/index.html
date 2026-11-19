@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#d9cbb4">
+<title>ロボットと巨大ねじ昇降機</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #d9cbb4; overscroll-behavior: none; }
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+  #app, #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  /* 起動中の絵（文字なし）：最初の描画が出るまで、回る歯車を見せる。シェルが最初のフレームで消す */
+  #boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 9; transition: opacity .35s; }
+  #boot svg { width: 22vmin; height: 22vmin; animation: bootspin 2.4s linear infinite; }
+  @keyframes bootspin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="boot" aria-hidden="true"><svg viewBox="0 0 100 100"><g fill="#f08a24" stroke="#3a2a1a" stroke-width="3"><path d="M44 6h12l2 12 8 3 10-7 8 8-7 10 3 8 12 2v12l-12 2-3 8 7 10-8 8-10-7-8 3-2 12H44l-2-12-8-3-10 7-8-8 7-10-3-8-12-2V44l12-2 3-8-7-10 8-8 10 7 8-3z"/><circle cx="50" cy="50" r="14" fill="#fff6dc"/></g></svg></div>
+<script>
+// 読み込み：file:// では ES モジュールと画像の WebGL 読み込みが拒否されるので、classic バンドルと data URI を使う。
+// http(s) では hero はソース（hero/hero.js）を直接 import する。?src=1 でシェルもソースから読む（開発用）。
+(function () {
+  var file = location.protocol === 'file:';
+  var q = location.search;
+  function add(src, mod) {
+    var s = document.createElement('script');
+    s.src = src; s.async = false;
+    if (mod) s.type = 'module';
+    document.body.appendChild(s);
+  }
+  if (file) { add('assets/textures-data.js'); add('hero/hero.bundle.js'); }
+  if (!file && /[?&]src=1/.test(q)) add('shell/main.js', true);
+  else add('dist/shell.js');
+})();
+</script>
+</body>
+</html>
