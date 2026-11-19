@@ -908,7 +908,17 @@
     var vcam = new T.PerspectiveCamera();
     var plane = new T.Plane(), nrm = new T.Vector3(), mPos = new T.Vector3(), cPos = new T.Vector3(), rot = new T.Matrix4();
     var look = new T.Vector3(), view = new T.Vector3(), tgt = new T.Vector3(), clip = new T.Vector4(), q = new T.Vector4();
-    var crop = new T.Matrix4(), cp = new T.Vector3();
+    var crop = new T.Matrix4(), cp = new T.Vector3(), dbs = new T.Vector2();
+    var rtW = size, rtH = Math.round(size * 1.5);
+    // match the render target to the glass's footprint on screen (≈1 texel per device pixel, capped by `size`):
+    // a phone shows the glass ~600 px tall, so it no longer renders a 512×768 MSAA target for it every frame
+    function fitTarget(renderer, bw, bh) {
+      renderer.getDrawingBufferSize(dbs);
+      var cap = size * 1.5, h = bh * 0.5 * dbs.y, w = bw * 0.5 * dbs.x;
+      var k = Math.min(1, cap / Math.max(h, 1), cap / Math.max(w, 1));
+      h = Math.max(96, Math.ceil(h * k / 32) * 32); w = Math.max(64, Math.ceil(w * k / 32) * 32);
+      if (Math.abs(h - rtH) > rtH * 0.12 || Math.abs(w - rtW) > rtW * 0.12) { rtW = w; rtH = h; rt.setSize(w, h); }
+    }
     var CORN = [-0.22, -0.38, 0.22, -0.38, 0.22, 0.38, -0.22, 0.38];
     var self = {};
     self.api = {
@@ -948,6 +958,7 @@
           x0 = Math.max(-1, x0 - 0.01); x1 = Math.min(1, x1 + 0.01); y0 = Math.max(-1, y0 - 0.01); y1 = Math.min(1, y1 + 0.01);
           if (x1 - x0 < 1e-3 || y1 - y0 < 1e-3) return;          // off screen
           crop.set(2 / (x1 - x0), 0, 0, -(x1 + x0) / (x1 - x0), 0, 2 / (y1 - y0), 0, -(y1 + y0) / (y1 - y0), 0, 0, 1, 0, 0, 0, 0, 1);
+          fitTarget(renderer, x1 - x0, y1 - y0);
           vcam.projectionMatrix.premultiply(crop);
         }
         texM.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
@@ -981,7 +992,15 @@
       setSize: function (px) {
         px = Math.round(GF.clamp(+px || 512, 64, 2048));
         if (px === size) return;
-        size = px; rt.setSize(px, Math.round(px * 1.5));
+        size = px; rtW = px; rtH = Math.round(px * 1.5); rt.setSize(rtW, rtH);
+      },
+      // compile the shader variants the mirror needs (screen pass with the reflection material, linear HDR target pass)
+      // ahead of time, so that opening the wings does not stall on shader compilation
+      prewarm: function (renderer, scene, camera) {
+        var cur = renderer.getRenderTarget(), m = glass.material;
+        glass.material = reflMat;
+        try { renderer.compile(scene, camera); renderer.setRenderTarget(rt); renderer.compile(scene, camera); }
+        finally { glass.material = m; renderer.setRenderTarget(cur); }
       },
       setEnabled: function (on) {
         enabled = !!on;

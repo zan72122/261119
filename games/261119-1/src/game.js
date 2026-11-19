@@ -94,7 +94,8 @@
     var clock = 0;
 
     // ---------------------------------------------------------------- sizing / camera
-    var view = { w: 390, h: 844, left: 0, top: 0, dpr: 1, scale: 1, bufH: 844 };
+    var PIX_BUDGET = 3.1e6;
+    var view = { w: 390, h: 844, left: 0, top: 0, dpr: 1, scale: 1, bufH: 844, pr: 0, sw: 0, sh: 0 };
     var shot = { from: { pos: [0, 0, 0], look: [0, 0, 0], halfW: 1, halfH: 1 }, to: GF.SHOTS.intro, k: 1, dur: 1.2,
       cur: { pos: [0, 0, 0], look: [0, 0, 0], halfW: 1, halfH: 1 } };
     function copyShot(dst, s) { dst.pos[0] = s.pos[0]; dst.pos[1] = s.pos[1]; dst.pos[2] = s.pos[2]; dst.look[0] = s.look[0]; dst.look[1] = s.look[1]; dst.look[2] = s.look[2]; dst.halfW = s.halfW; dst.halfH = s.halfH; }
@@ -119,9 +120,14 @@
         var r = canvas.getBoundingClientRect();
         var w = Math.round(r.width) || window.innerWidth || 390, h = Math.round(r.height) || window.innerHeight || 844;
         view.w = Math.max(1, w); view.h = Math.max(1, h); view.left = r.left; view.top = r.top;
-        view.dpr = Math.min(window.devicePixelRatio || 1, 2);
-        renderer.setPixelRatio(view.dpr * view.scale);
-        renderer.setSize(view.w, view.h, false);
+        // device pixel ratio capped at 2 and at a total pixel budget (big iPads would otherwise shade ~5.6M px per frame)
+        view.dpr = Math.min(window.devicePixelRatio || 1, 2, Math.max(1, Math.sqrt(PIX_BUDGET / (view.w * view.h))));
+        var pr = Math.round(view.dpr * view.scale * 100) / 100;
+        if (pr !== view.pr || view.w !== view.sw || view.h !== view.sh) {   // re-allocating the drawing buffer is costly: only when it changes
+          view.pr = pr; view.sw = view.w; view.sh = view.h;
+          renderer.setPixelRatio(pr);
+          renderer.setSize(view.w, view.h, false);
+        }
         view.bufH = renderer.getContext().drawingBufferHeight || view.h;
         GF.applyShot(camera, shot.cur, view.w / view.h);
       } catch (e) { /* */ }
@@ -1347,7 +1353,9 @@
     });
 
     // ---------------------------------------------------------------- performance
-    var perf = { ft: 16, nextCheck: 3, slowAtMin: 0 };
+    // 1 s windows of real frame times; resolution steps down below ~42 fps and back up only after 3 s of smooth
+    // frames, never above a level that just failed (no resize ping-pong, which itself stutters)
+    var perf = { acc: 0, n: 0, slow: 0, nextCheck: 3, slowAtMin: 0, good: 0, ceil: 1, upAt: -10 };
     function enterLowPower() {
       if (state.lowPower) return;
       state.lowPower = true;
@@ -1358,15 +1366,21 @@
     }
     if (low) { try { D.mirror.setSize(256); hair.setDetail(0.6); } catch (e) { /* */ } }
     function perfStep(rawDt) {
-      if (rawDt <= 0 || rawDt > 0.3) return;
-      perf.ft = perf.ft * 0.93 + rawDt * 1000 * 0.07;
-      if (clock < perf.nextCheck) return;
+      if (rawDt <= 0 || rawDt > 1) return;                     // tab switches etc. are not load
+      perf.acc += rawDt; perf.n++; if (rawDt > 0.024) perf.slow++;
+      if (clock < perf.nextCheck || perf.n < 20) return;
       perf.nextCheck = clock + 1;
-      var s = view.scale;
-      if (perf.ft > 36) {
-        if (s > 0.551) { view.scale = Math.max(0.55, s - 0.1); resize(); }
-        else if (!state.lowPower && ++perf.slowAtMin >= 2) enterLowPower();
-      } else if (perf.ft < 20 && s < 1) { view.scale = Math.min(1, s + 0.1); resize(); perf.slowAtMin = 0; }
+      var ft = perf.acc / perf.n * 1000, slow = perf.slow / perf.n, s = view.scale;
+      perf.acc = 0; perf.n = 0; perf.slow = 0;
+      if (slow > 0.5) {                                        // most frames slow (a single compile hitch is not)
+        perf.good = 0;
+        if (s > 0.601) {
+          if (clock - perf.upAt < 3.5) perf.ceil = Math.max(0.6, s - 0.1);
+          view.scale = Math.max(0.6, Math.round((s - 0.1) * 10) / 10); resize();
+        } else if (!state.lowPower && ++perf.slowAtMin >= 2) enterLowPower();
+      } else if (ft < 18.5 && slow < 0.1 && s < perf.ceil - 0.001) {
+        if (++perf.good >= 3) { perf.good = 0; view.scale = Math.min(perf.ceil, Math.round((s + 0.1) * 10) / 10); perf.upAt = clock; perf.slowAtMin = 0; resize(); }
+      } else perf.good = 0;
     }
 
     // ---------------------------------------------------------------- frame
@@ -1402,7 +1416,40 @@
       audio.update(dt);
       if (saveAt > 0 && clock > saveAt) save();
     }
+    // shader / shadow-program warm-up, one chunk per frame right after start-up (the intro is calm), so that later
+    // moments (opening the mirror, props appearing, the genkan scene) do not stutter on first-time compilation
+    var warm = 0, stash = [];
+    // compile only the materials of what can appear with the given set (renderer.compile walks the whole scene,
+    // hidden objects included, which would also build useless variants of the other set under these lights)
+    function compileFor(name, mirrorToo) {
+      var excl = name === 'dresser' ? [sets.genkan.group, mom.group] : [sets.dresser.group, props.group];
+      for (var i = 0; i < excl.length; i++) excl[i].traverse(function (o) { if (o.material) { stash.push(o, o.material); o.material = null; } });
+      try {
+        if (mirrorToo) D.mirror.prewarm(renderer, scene, camera); else renderer.compile(scene, camera);
+      } finally {
+        for (var j = 0; j < stash.length; j += 2) stash[j].material = stash[j + 1];
+        stash.length = 0;
+      }
+    }
+    function prewarm() {
+      warm++;
+      try {
+        if (warm === 2) compileFor(state.scene, state.scene === 'dresser');
+        else if (warm === 3) {
+          var other = state.scene === 'dresser' ? 'genkan' : 'dresser';
+          var pv = props.group.visible, mv = mom.group.visible;
+          sets.activate(other);
+          props.group.visible = other === 'dresser'; mom.group.visible = other === 'genkan';
+          try {
+            scene.updateMatrixWorld();
+            compileFor(other, other === 'dresser');
+            renderer.render(scene, camera);   // shadow pass of that set (depth programs); overdrawn by this frame's real render
+          } finally { sets.activate(state.scene); props.group.visible = pv; mom.group.visible = mv; scene.updateMatrixWorld(); }
+        }
+      } catch (e) { /* warm-up is optional */ }
+    }
     function render() {
+      if (warm < 3) prewarm();
       if (state.scene === 'dresser') {
         mirrorFrame++;
         if (!state.lowPower || (mirrorFrame & 1) === 0) D.mirror.update(renderer, scene, camera);
