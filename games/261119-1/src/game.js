@@ -1450,16 +1450,24 @@
     }
     function render() {
       if (warm < 3) prewarm();
-      if (state.scene === 'dresser') {
-        mirrorFrame++;
-        if (!state.lowPower || (mirrorFrame & 1) === 0) D.mirror.update(renderer, scene, camera);
-      }
-      renderer.render(scene, camera);
+      // world matrices once per frame (the mirror pass and the main pass would each walk the whole scene again)
+      scene.updateMatrixWorld();
+      scene.matrixWorldAutoUpdate = false;
+      try {
+        if (state.scene === 'dresser') {
+          mirrorFrame++;
+          if (!state.lowPower || (mirrorFrame & 1) === 0) D.mirror.update(renderer, scene, camera);
+        }
+        renderer.render(scene, camera);
+      } finally { scene.matrixWorldAutoUpdate = true; }
     }
     function frame(now) {
       raf = 0;
       if (paused || hiddenFlag) return;
       raf = requestAnimationFrame(frame);
+      // 120 Hz displays (ProMotion iPad): draw every other refresh. Same motion, half the GPU work and heat,
+      // so the device does not throttle into uneven frames later on
+      if (lastNow >= 0 && now - lastNow < 10.5) return;
       var rawDt = lastNow < 0 ? 1 / 60 : (now - lastNow) / 1000;
       lastNow = now;
       var dt = clamp(rawDt, 0, 0.05);

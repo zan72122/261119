@@ -860,6 +860,7 @@
       var mm = mirror.api.mesh, mv = mm.visible; mm.visible = false;
       wingGlasses.forEach(function (o) { o.visible = false; });
       scene.add(ccam);
+      ccam.updateMatrixWorld(true);   // the game may render with scene.matrixWorldAutoUpdate off
       ccam.update(renderer, scene);
       scene.remove(ccam);
       wingGlasses.forEach(function (o) { o.visible = true; });
