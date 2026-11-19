@@ -135,7 +135,7 @@ export function startGame(engine, A) {
       plate = makeBerryPlate(); plate.visible = false; engine.add(plate);
       for (let i = 0; i < 6; i++) {
         const it = { obj: makeStrawberry(i), kind: 'berry', idx: i, state: 'tray', local: new V3(), flame: null, lit: false };
-        items.push(it); berries.push(it); engine.add(it.obj);
+        items.push(it); berries.push(it); putInTray(it);
       }
       warm(plate); for (const it of berries) warm(it.obj);
     },
@@ -146,7 +146,7 @@ export function startGame(engine, A) {
         const fl = createFlame();
         c.userData.wickTop.add(fl.object);
         const it = { obj: c, kind: 'candle', idx: i, state: 'tray', local: new V3(), flame: fl, lit: false };
-        items.push(it); candles.push(it); engine.add(c); fxFlames.push(fl);
+        items.push(it); candles.push(it); putInTray(it); fxFlames.push(fl);
       }
       warm(box); for (const it of candles) warm(it.obj);
     },
@@ -159,6 +159,8 @@ export function startGame(engine, A) {
     },
     () => { cracker = makeCracker(); cracker.visible = false; engine.add(cracker); warm(cracker); },
     () => { papa = makePapa(); papa.visible = false; engine.addBg(papa); warm(papa); },
+    // shadow-map shaders of the new props (an offscreen shadow pass; the real map is redrawn after)
+    () => { engine.warmShadows([spatula, plate, box, lighter, cracker]); },
   ];
   function lateStep() {
     if (late.mats.length) { link(); return; }

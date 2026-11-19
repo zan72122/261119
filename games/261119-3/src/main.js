@@ -58,7 +58,7 @@ function boot() {
   engine.start();
   // the engine's first frame is queued just above: fade the splash once that frame is drawn
   requestAnimationFrame(hideSplash);
-  setTimeout(hideSplash, 4000); // never leave it up (e.g. a lost context)
+  setTimeout(hideSplash, 8000); // never leave it up (e.g. a lost context)
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

@@ -624,6 +624,40 @@ export function createEngine(container) {
     }
   }
 
+  // one shadow pass with the given hidden objects shown, so their shadow shaders get compiled.
+  // Runs inside a frame just before the real render, drawing to the screen through an empty
+  // scissor box (nothing lands on screen, and the shaders are the same ones the real frames use);
+  // the real frame right after redraws the shadow map and the whole picture.
+  let warmList = null;
+  const _warmPos = [];
+  function warmShadowPass() {
+    const objs = warmList; warmList = null;
+    if (!objs || !key.visible) return;
+    const vis = [];
+    _warmPos.length = 0;
+    for (const obj of objs) {
+      obj.traverse((o) => { vis.push(o, o.visible); o.visible = true; });
+      // parked props may sit outside the shadow box (and be culled): bring them to the middle
+      _warmPos.push(obj.position.clone()); obj.position.set(0, 0.05, 0);
+    }
+    const mask = camera.layers.mask;
+    try {
+      camera.layers.set(0); // the shadow pass picks casters by the main camera's layers
+      renderer.setRenderTarget(null);
+      renderer.setScissor(0, 0, 0, 0);
+      renderer.setScissorTest(true);
+      renderer.shadowMap.needsUpdate = true;
+      renderer.render(scene, camera);
+    } catch (e) { /* compiled on first use instead */ } finally {
+      renderer.setScissorTest(false);
+      renderer.setScissor(0, 0, cssW, cssH);
+      camera.layers.mask = mask;
+      for (let i = 0; i < vis.length; i += 2) vis[i].visible = vis[i + 1];
+      for (let i = 0; i < objs.length; i++) objs[i].position.copy(_warmPos[i]);
+      shadowForce = true; bgForce = true;
+    }
+  }
+
   // ---------------------------------------------------------------- loop
   const updaters = [];
   const visListeners = [];
@@ -654,7 +688,10 @@ export function createEngine(container) {
       fadeMat.opacity = lerp(fadeState.from, fadeState.to, easeInOut(k));
       if (k >= 1) { fadeState.active = false; const r = fadeState.resolve; fadeState.resolve = null; if (r) r(); }
     }
-    if (!contextLost) render(true);
+    if (!contextLost) {
+      if (warmList) warmShadowPass();
+      render(true);
+    }
   }
   function startLoop() {
     if (running || !started || contextLost) return;
@@ -740,6 +777,8 @@ export function createEngine(container) {
         fadeState.active = true; fadeState.resolve = resolve;
       });
     },
+    // compile the shadow-map shaders of hidden objects ahead of time (done at the start of the next frame)
+    warmShadows(objs) { warmList = objs; },
     snapshot(size = 320) {
       try {
         if (contextLost) return null;
