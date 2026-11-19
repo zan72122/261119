@@ -24,6 +24,14 @@ body { position: fixed; inset: 0; }
   -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
 }
 #app canvas { display: block; touch-action: none; outline: none; }
+/* blurred picture of the first scene: painted before the game script runs, faded out on the first frame */
+#splash {
+  position: fixed; inset: -24px; pointer-events: none;
+  background: #c9955d url("__POSTER_SRC__") center / cover no-repeat;
+  filter: blur(14px); transform: translateZ(0);
+  transition: opacity 0.45s ease-out;
+}
+#splash.off { opacity: 0; }
 #fallback {
   display: none; position: fixed; inset: 0; width: 100%; height: 100%;
   object-fit: cover; pointer-events: none;
@@ -33,9 +41,27 @@ body { position: fixed; inset: 0; }
 </head>
 <body>
 <div id="app"></div>
+<div id="splash"></div>
 <img id="fallback" alt="" draggable="false" src="__FALLBACK_SRC__">
-<script>
+<!-- the game itself: kept as text so the page (splash) can paint before it is parsed and run -->
+<script type="text/plain" id="game-src">
 __BUNDLE__
+</script>
+<script>
+(function () {
+  var started = false;
+  function run() {
+    if (started) return; started = true;
+    var src = document.getElementById('game-src');
+    var s = document.createElement('script');
+    s.text = src.textContent;
+    src.parentNode.removeChild(src);
+    document.body.appendChild(s);
+  }
+  // let the browser show the splash first (rAF fires before that paint, the timeout after it)
+  if (window.requestAnimationFrame && !document.hidden) requestAnimationFrame(function () { setTimeout(run, 0); });
+  setTimeout(run, document.hidden ? 0 : 1500); // rAF is paused in background tabs
+})();
 </script>
 </body>
 </html>

@@ -30,9 +30,14 @@ export async function build({ plugins = [], outFile = path.join(root, 'index.htm
     ? 'data:image/jpeg;base64,' + readFileSync(fb).toString('base64')
     : PLACEHOLDER_IMG;
 
+  const ps = path.join(root, 'assets/poster.jpg');
+  const posterSrc = existsSync(ps)
+    ? 'data:image/jpeg;base64,' + readFileSync(ps).toString('base64')
+    : PLACEHOLDER_IMG;
+
   const tpl = readFileSync(path.join(root, 'index.template.html'), 'utf8');
   // function replacers: no `$` pattern interpretation inside the bundle
-  const html = tpl.replace('__FALLBACK_SRC__', () => fallbackSrc).replace('__BUNDLE__', () => js);
+  const html = tpl.replace('__POSTER_SRC__', () => posterSrc).replace('__FALLBACK_SRC__', () => fallbackSrc).replace('__BUNDLE__', () => js);
   writeFileSync(outFile, html);
   const kb = (Buffer.byteLength(html) / 1024).toFixed(1);
   console.log(`${path.relative(root, outFile) || outFile}: ${kb} KiB (script ${(Buffer.byteLength(js) / 1024).toFixed(1)} KiB)`);

@@ -2,7 +2,15 @@ import { createEngine } from './engine.js';
 import { createAudio } from './audio.js';
 import { startGame } from './game.js';
 
+function hideSplash() {
+  const sp = document.getElementById('splash');
+  if (!sp || sp.classList.contains('off')) return;
+  sp.classList.add('off');
+  setTimeout(() => { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 600);
+}
+
 function showFallback() {
+  hideSplash();
   const img = document.getElementById('fallback');
   if (img) img.style.display = 'block';
   const app = document.getElementById('app');
@@ -48,6 +56,9 @@ function boot() {
     console.warn(e);
   }
   engine.start();
+  // the engine's first frame is queued just above: fade the splash once that frame is drawn
+  requestAnimationFrame(hideSplash);
+  setTimeout(hideSplash, 4000); // never leave it up (e.g. a lost context)
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

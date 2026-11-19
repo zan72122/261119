@@ -60,8 +60,10 @@ export function startGame(engine, A) {
   // ================================================================ world
   const counter = makeCounter(); engine.add(counter);
   const room = makeRoom(); engine.addBg(room);
-  const papa = makePapa(); engine.addBg(papa);
-  papa.visible = false;
+  // Papa and the later-stage props are built while the first stage is being played (see `late`
+  // below). Until then these names hold empty, hidden stand-ins.
+  const stub = () => { const g = new THREE.Group(); g.visible = false; return g; };
+  let papa = stub();
   // party decorations: pull them a little lower so they read above Papa in the PARTY view
   room.userData.garland.position.set(0, -0.08, 0);
   room.userData.fairyLights.position.set(0, -0.02, 0);
@@ -88,25 +90,10 @@ export function startGame(engine, A) {
   sponge.add(cakeCream.object);
   const CAKE_TOP = STAND_TOP + cakeCream.topY(); // local y of the coat top
 
-  const spatula = makeSpatula(); engine.add(spatula);
-  const plate = makeBerryPlate(); engine.add(plate);
-  const box = makeCandleBox(); engine.add(box);
-  const lighter = makeLighter(); engine.add(lighter);
-  const lighterFlame = createFlame({ scale: 1.3 });
-  lighter.userData.tip.add(lighterFlame.object);
-  const cracker = makeCracker(); engine.add(cracker);
-
-  const items = [];
-  for (let i = 0; i < 6; i++) items.push({ obj: makeStrawberry(i), kind: 'berry', idx: i, state: 'tray', local: new V3(), flame: null, lit: false });
-  for (let i = 0; i < 5; i++) {
-    const c = makeCandle(i);
-    const fl = createFlame();
-    c.userData.wickTop.add(fl.object);
-    items.push({ obj: c, kind: 'candle', idx: i, state: 'tray', local: new V3(), flame: fl, lit: false });
-  }
-  const berries = items.filter((it) => it.kind === 'berry');
-  const candles = items.filter((it) => it.kind === 'candle');
-  for (const it of items) engine.add(it.obj);
+  let spatula = stub(), plate = stub(), box = stub(), lighter = stub(), cracker = stub();
+  let lighterFlame = null;
+  const items = [], berries = [], candles = [];
+  const fxFlames = [];
 
   const splats = createSplats(); engine.add(splats.object); camera.add(splats.lens);
   const glow = createCandleGlow(); scene.add(glow.light, glow.light2);
@@ -119,6 +106,81 @@ export function startGame(engine, A) {
   const hints = createHints(); engine.add(hints.object);
 
   const W = createWorldFx({ THREE, tl, A, frame, drawingTex, engine });
+
+  // ================================================================ late props (built in the background)
+  // The first stage (pour / whip) needs only the counter, bowl, carton, mixer and cake. Everything
+  // that appears later is made a piece at a time in idle moments after the first picture is up,
+  // and its shaders are compiled right after, so nothing hitches when it slides in.
+  const renderer = engine.renderer;
+  const late = { step: 0, done: false, timer: 0, mats: [] };
+  // issue the compile now; the (possibly blocking) link check runs in the next idle slot
+  const warm = (obj) => {
+    try { renderer.compile(obj, camera, scene).forEach((m) => late.mats.push(m)); } catch (e) { /* compiled on first use instead */ }
+  };
+  function link() {
+    const mats = late.mats; late.mats = [];
+    for (const m of mats) {
+      try {
+        const prog = renderer.properties.get(m).currentProgram;
+        if (prog && prog.isReady()) prog.getUniforms();
+      } catch (e) { /* ignore */ }
+    }
+  }
+  const LATE = [
+    // effects already in the scene but hidden at the start (pour stream first: it is needed soonest)
+    () => { warm(pour.object); },
+    () => { warm(scene); },
+    () => { spatula = makeSpatula(); spatula.visible = false; engine.add(spatula); warm(spatula); },
+    () => {
+      plate = makeBerryPlate(); plate.visible = false; engine.add(plate);
+      for (let i = 0; i < 6; i++) {
+        const it = { obj: makeStrawberry(i), kind: 'berry', idx: i, state: 'tray', local: new V3(), flame: null, lit: false };
+        items.push(it); berries.push(it); engine.add(it.obj);
+      }
+      warm(plate); for (const it of berries) warm(it.obj);
+    },
+    () => {
+      box = makeCandleBox(); box.visible = false; engine.add(box);
+      for (let i = 0; i < 5; i++) {
+        const c = makeCandle(i);
+        const fl = createFlame();
+        c.userData.wickTop.add(fl.object);
+        const it = { obj: c, kind: 'candle', idx: i, state: 'tray', local: new V3(), flame: fl, lit: false };
+        items.push(it); candles.push(it); engine.add(c); fxFlames.push(fl);
+      }
+      warm(box); for (const it of candles) warm(it.obj);
+    },
+    () => {
+      lighter = makeLighter(); lighter.visible = false; engine.add(lighter);
+      lighterFlame = createFlame({ scale: 1.3 });
+      lighter.userData.tip.add(lighterFlame.object);
+      fxFlames.unshift(lighterFlame);
+      warm(lighter);
+    },
+    () => { cracker = makeCracker(); cracker.visible = false; engine.add(cracker); warm(cracker); },
+    () => { papa = makePapa(); papa.visible = false; engine.addBg(papa); warm(papa); },
+  ];
+  function lateStep() {
+    if (late.mats.length) { link(); return; }
+    if (late.step >= LATE.length) return;
+    const first = late.step === 0;
+    try { LATE[late.step](); } catch (e) { console.warn(e); }
+    late.step++;
+    if (late.step === LATE.length) { late.done = true; resetLate(); }
+    if (first) link(); // keep pour stream ready without waiting another slot
+  }
+  // everything at once (a stage that needs the props was reached before the idle work finished)
+  function ensureLate() {
+    if (late.done) return;
+    while (!late.done) lateStep();
+  }
+  function scheduleLate(delay) {
+    if ((late.done && !late.mats.length) || late.timer) return;
+    late.timer = setTimeout(() => {
+      const run = () => { late.timer = 0; lateStep(); scheduleLate(40); };
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 300 }); else run();
+    }, delay);
+  }
 
   splats.setHeightFn((x, z) => {
     // drops falling into the bowl or onto the cake are swallowed (those move later)
@@ -376,6 +438,7 @@ export function startGame(engine, A) {
   const STAGES = {};
   function enter(name) {
     if (S.stage === name) return;
+    if (name !== 'POUR' && name !== 'WHIP') ensureLate();
     S.stage = name;
     S.idle = 0; HD.lastLevel = -1;
     hints.finger.stop();
@@ -1502,22 +1565,12 @@ export function startGame(engine, A) {
     G.held = false; G.glide = false; G.z = CAKE_HOME.z; G.prevZ = G.z; G.wind = 0;
     // tools
     K.held = false;
-    spatula.visible = false; spatula.position.copy(OFF); spatula.quaternion.identity(); spatula.userData.setCream(0); spatula.userData._mv = null;
-    plate.visible = false; plate.position.copy(OFF); plate.quaternion.identity(); plate.userData._mv = null;
-    box.visible = false; box.position.copy(OFF); box.quaternion.identity(); box.userData._mv = null;
     L.held = false;
-    lighter.visible = false; lighter.userData._mv = null; lighter.userData.setTrigger(false); lighterFlame.setLit(false, true);
-    lighter.position.copy(OFF);
     IC.item = null;
-    for (const it of items) {
-      it.lit = false; it.obj.userData._mv = null; it.obj.userData._jig = null;
-      if (it.flame) { it.flame.setLit(false, true); it.flame.setWind(0, 0); }
-      putInTray(it);
-    }
     glow.set(0, litCentroid);
     // popper
     Object.assign(PO, { up: false, held: false, pull: 0, firing: false, palette: 0 });
-    cracker.visible = false; cracker.userData.setFired(false); cracker.userData.setPull(0);
+    resetLate();
     // Papa
     papaReset(); P.rate.lean = 3.2;
     // fx
@@ -1525,6 +1578,23 @@ export function startGame(engine, A) {
     frame.userData._hop = null; frame.position.copy(FRAME_POS); frame.rotation.set(0, FRAME_YAW, 0);
     enter('POUR');
     frameTo('PREP', 0);
+  }
+
+  // the later props' share of resetWorld (runs again once they exist)
+  function resetLate() {
+    if (!late.done) return;
+    spatula.visible = false; spatula.position.copy(OFF); spatula.quaternion.identity(); spatula.userData.setCream(0); spatula.userData._mv = null;
+    plate.visible = false; plate.position.copy(OFF); plate.quaternion.identity(); plate.userData._mv = null;
+    box.visible = false; box.position.copy(OFF); box.quaternion.identity(); box.userData._mv = null;
+    lighter.visible = false; lighter.userData._mv = null; lighter.userData.setTrigger(false); lighterFlame.setLit(false, true);
+    lighter.position.copy(OFF);
+    for (const it of items) {
+      it.lit = false; it.obj.userData._mv = null; it.obj.userData._jig = null;
+      if (it.flame) { it.flame.setLit(false, true); it.flame.setWind(0, 0); }
+      putInTray(it);
+    }
+    cracker.visible = false; cracker.userData.setFired(false); cracker.userData.setPull(0);
+    papaReset();
   }
 
   // ---------------------------------------------------------------- finger demonstrations (built only when shown)
@@ -1556,7 +1626,6 @@ export function startGame(engine, A) {
   };
 
   // ================================================================ main update
-  const fxFlames = [lighterFlame, ...candles.map((c) => c.flame)];
   engine.onUpdate((dt, t) => {
     S.time = t;
     OT.cool = Math.max(0, OT.cool - dt);
@@ -1591,18 +1660,16 @@ export function startGame(engine, A) {
 
   // ================================================================ boot
   W.loadSavedPhoto();
-  // compile every material once up front (hidden props would otherwise hitch when they first appear)
-  try {
-    const hidden = [];
-    scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
-    engine.renderer.compile(scene, camera);
-    for (const o of hidden) o.visible = false;
-  } catch (e) { /* ignore */ }
   resetWorld();
+  // the first picture shows only what is on the counter now; once it is up, the props for the
+  // later stages are made in the background (they are hidden until their stage)
+  let shown = 0;
+  const kick = () => { if (++shown >= 3) { engine.offUpdate(kick); scheduleLate(120); } };
+  engine.onUpdate(kick);
 
   return {
     state: S,
-    objects: { bowl, carton, mixer, cake, sponge, spatula, plate, box, lighter, cracker, frame, papa, items, room, counter },
+    get objects() { return { bowl, carton, mixer, cake, sponge, spatula, plate, box, lighter, cracker, frame, papa, items, room, counter }; },
     fx: { bowlCream, cakeCream, splats, confetti, hints, pour },
   };
 }
